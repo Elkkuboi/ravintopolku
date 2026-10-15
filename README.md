@@ -103,3 +103,14 @@ Selainajo käynnistää oikean tuotantopalvelimen portissa 4173 testiasetuksilla
 **Live-aktivointi jää paikallisiin tunnuksiisi:** tässä ympäristössä ei ole OpenAI-avainta eikä tehty maksullista kutsua. API-sopimus ja virhetilat on testattu kontrolloiduilla vastauksilla; oikea malli, avain, laskutus ja kuva-analyysin laatu on vielä varmistettava omassa projektissasi. Aiopsin lähdekoodia ei saatu luettua (GitHub-tunnistus palautti HTTP 401), joten toimitus sisältää testatun Ravintopolun vastaanottimen ja lähetys-CLI:n, ei live-aiopsin job-adapteria. Oikeaa Pixel 10a:ta ei ollut käytössä. Mitään ei julkaistu.
 
 Dokumentit: [arkkitehtuuri](docs/architecture.md), [AI](docs/ai-integration.md), [ILMARI](docs/ilmari-integration.md), [kirjastot](docs/dependencies.md) ja [analytiikan jatkotyö](docs/analytics-roadmap.md). Seuraavat työt: paikallinen avain/mallikoe ja puhelimen HTTPS-varmistus; aiops-repon tarkastuksen jälkeen erillinen sallittu tulosvälittäjä ilman gatewayn tai dispatcherin verkkovaltaa; myöhemmin regressio, robusti tasoitus ja epävarmuus kattavuuskriteereineen. JSON- ja integraatioskeemojen versio on edelleen 1; merkitystä muutettaessa tarvitaan versionnosto ja migraatio.
+
+## Työasemalla (aiops ADR-0014, vaihe R1)
+
+Päiväkirja tarjoillaan työaseman Tailscale Serven kautta omassa alkuperässään `https://tyoasema.taild1a5b7.ts.net:8443`
+ilman Node-palvelinta: ei OpenAI-luonnoksia, ei ILMARI-laatikkoa eikä salasanaa. Päiväkirja on puhelimen selaimessa, joten
+ota JSON-varmuuskopio säännöllisesti (Asetukset → Varmuuskopio).
+
+Käännös ja asennus repon juuresta: `sudo scripts/asenna-tyoasema.sh`. Skripti kääntää commitoidun koodin kertakäyttöisissä
+konteissa tiivisteellä kiinnitetystä Node 24 -imagesta (riippuvuudet ilman asennusskriptejä, testit ja käännös ilman verkkoa)
+ja asentaa vain `dist/`-hakemiston kohteeseen `/opt/ravintopolku/dist`. Serve-määritys ja tailnet-politiikka ovat aiops-repon
+isäntämuutoksia.
