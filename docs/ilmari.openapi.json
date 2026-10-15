@@ -1,0 +1,310 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Ravintopolku – ILMARI-tulosliitäntä",
+    "version": "1.0.0",
+    "description": "Vastaanottaa tarkistettavia aterialuonnoksia. Ei työjonoa, hyväksyntävaltaa tai automaattista päiväkirjakirjoitusta."
+  },
+  "servers": [
+    {
+      "url": "/api/integrations/v1"
+    }
+  ],
+  "security": [
+    {
+      "integrationToken": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "integrationToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque scoped token"
+      }
+    },
+    "schemas": {
+      "IncomingDraft": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+          },
+          "externalId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._:-]{1,128}$"
+          },
+          "dataClass": {
+            "type": "string",
+            "enum": ["public", "private", "restricted"]
+          },
+          "draft": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "number",
+                "const": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "lines": {
+                "minItems": 1,
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["per100", "portion"]
+                    },
+                    "grams": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 100000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "values": {
+                      "type": "object",
+                      "properties": {
+                        "energy": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "protein": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "carbs": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "fat": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "fiber": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "energy",
+                        "protein",
+                        "carbs",
+                        "fat",
+                        "fiber"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "source": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "state": {
+                      "type": "string",
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "mode",
+                    "grams",
+                    "values",
+                    "source",
+                    "state"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "unknowns": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              },
+              "assumptions": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              },
+              "questions": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              },
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": ["provider", "model", "note"],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "name",
+              "lines",
+              "unknowns",
+              "assumptions",
+              "questions",
+              "provenance"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "source",
+          "externalId",
+          "dataClass",
+          "draft"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "paths": {
+    "/schema": {
+      "get": {
+        "summary": "Luonnoksen skeema ja rajat",
+        "responses": {
+          "200": {
+            "description": "Skeema ja kyvykkyydet"
+          },
+          "401": {
+            "description": "Integraatioavain puuttuu"
+          }
+        }
+      }
+    },
+    "/drafts": {
+      "post": {
+        "summary": "Jätä muokattava luonnos käyttäjän tarkistettavaksi",
+        "description": "source + externalId on idempotenssiavain 7 päivän säilytysajan sisällä. restricted hylätään. Integraatioavain ei oikeuta OpenAI-kutsuihin tai päiväkirjan lukemiseen.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncomingDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sama aiemmin vastaanotettu luonnos; state=pending_review tai already_reviewed"
+          },
+          "201": {
+            "description": "state=pending_review ja id"
+          },
+          "401": {
+            "description": "Väärä avain"
+          },
+          "403": {
+            "description": "restricted ei ole sallittu"
+          },
+          "409": {
+            "description": "Sama externalId, eri sisältö"
+          },
+          "422": {
+            "description": "Virheellinen luonnos"
+          },
+          "429": {
+            "description": "Käyttö- tai laatikkoraja"
+          }
+        }
+      }
+    }
+  }
+}

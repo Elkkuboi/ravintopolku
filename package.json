@@ -1,0 +1,53 @@
+{
+  "name": "ravintopolku",
+  "private": true,
+  "version": "1.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "typecheck": "tsc -b && tsc -p tsconfig.server.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "format": "prettier --write src server integrations scripts tests docs *.ts *.json *.md index.html",
+    "schema": "node scripts/export-ai-schema.mjs && node scripts/export-integration-schema.mjs",
+    "server": "node --env-file-if-exists=.env --import tsx server/index.ts",
+    "start": "npm run server",
+    "dev:full": "concurrently -k \"npm run server\" \"npm run dev\"",
+    "setup": "node scripts/setup.mjs",
+    "ilmari": "node --import tsx integrations/ilmari/bridge.ts",
+    "test:subpath": "node --import tsx tests/subpath.smoke.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/static": "^10.1.5",
+    "dexie": "^4.4.6",
+    "dexie-react-hooks": "^4.4.0",
+    "fastify": "^5.12.5",
+    "lucide-react": "^1.50.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "recharts": "^3.10.1",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.19.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "fake-indexeddb": "^6.2.5",
+    "oxlint": "^1.81.0",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.2",
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^5.0.3"
+  }
+}
