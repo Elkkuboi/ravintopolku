@@ -50,6 +50,11 @@ export class DiaryDB extends Dexie {
       days: "id,&date",
       settings: "id",
     });
+    // R2 (aiops ADR-0016): viimeksi synkronoitu pohja ja synkronoinnin tila. Data-taulut ennallaan.
+    this.version(2).stores({
+      synkPohja: "[taulu+id]",
+      synkTila: "avain",
+    });
   }
 }
 export const db = new DiaryDB();

@@ -114,3 +114,13 @@ Käännös ja asennus repon juuresta: `sudo scripts/asenna-tyoasema.sh`. Skripti
 konteissa tiivisteellä kiinnitetystä Node 24 -imagesta (riippuvuudet ilman asennusskriptejä, testit ja käännös ilman verkkoa)
 ja asentaa vain `dist/`-hakemiston kohteeseen `/opt/ravintopolku/dist`. Serve-määritys ja tailnet-politiikka ovat aiops-repon
 isäntämuutoksia.
+
+## Synkronointi työasemalle (aiops ADR-0016, vaihe R2)
+
+Työasemalla portin 8443 takana on Ravintopolun oma palvelin (`palvelin/`, Python): se tarjoilee sovelluksen turvaotsakkein
+ja synkronointirajapinnan Tailscale-tunnistuksella. Päiväkirja synkronoituu laitteiden välillä automaattisesti (käynnistyessä,
+5 minuutin välein, verkon palatessa) ja käsin Asetusten Synkronointi-osiosta. Palvelin ratkaisee ristiriidat saapumisjärjestyksessä,
+myös saman päivän merkinnöissä, ja poistot säilyvät. Yli 25 poistoa kerralla vaatii vahvistuksen. Kuvat pysyvät laitteella.
+
+Palvelin ottaa päivittäisen varmuuskopion (30 päivää) ja kirjoittaa nykytilan julkiseen datahakemistoon Ilmarin luettavaksi.
+Testit: `cd palvelin && uv run --frozen pytest -q` ja `npm test`. Asennus: `sudo scripts/asenna-tyoasema.sh "$(command -v uv)"`.

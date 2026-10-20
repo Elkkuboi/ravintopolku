@@ -1,0 +1,56 @@
+# ravintopolku.service (aiops ADR-0016). Asennus: scripts/asenna-tyoasema.sh kopioi tämän hakemistoon /etc/systemd/system/.
+# Kuuntelee Unix-soketissa /run/ravintopolku/palvelin.sock (hakemisto 0700), johon Tailscale Serve ohjaa portin 8443.
+# Kovennus Ilmari Hubin mallilla. Erot: kirjoitusoikeus vain päiväkirjan hakemistoon ja julkiseen kopioon (BindPaths);
+# /srv:stä ei näy muuta. Ei ryhmiä aiops eikä docker, ei verkkoa, ei salaisuuksia. Testi palvelin/tests/test_yksikko.py.
+
+[Unit]
+Description=Ravintopolku: päiväkirjan synkronointipalvelin portissa 8443 (aiops ADR-0016)
+
+[Service]
+Type=simple
+User=ravintopolku
+Group=ravintopolku
+UMask=0077
+WorkingDirectory=/
+ExecStart=/opt/ravintopolku/palvelin/.venv/bin/ravintopolku-palvelin --config /etc/ravintopolku/palvelin.toml --socket /run/ravintopolku/palvelin.sock
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+RuntimeDirectory=ravintopolku
+RuntimeDirectoryMode=0700
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+TemporaryFileSystem=/srv:ro
+BindPaths=/srv/aiops/ravintopolku /srv/aiops/data/public/ravintopolku
+InaccessiblePaths=/etc/aiops
+
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+
+PrivateDevices=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectProc=invisible
+
+CapabilityBoundingSet=
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

@@ -2,6 +2,7 @@ import { type AIDraft } from "./ai/provider";
 import { dismissDraft } from "./ai/client";
 import { connectionChanged } from "./ai/useAIStatus";
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import { useAutoSync } from "./data/useAutoSync";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import {
@@ -75,6 +76,7 @@ const tabs = [
   { id: "settings", label: "Asetukset", icon: Settings },
 ] as const;
 export default function App() {
+  useAutoSync();
   const real = useLiveQuery(() => readDataset(), []),
     [demo, setDemo] = useState(false),
     example = useMemo(() => demoDataset(), []),

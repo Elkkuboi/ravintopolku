@@ -1,0 +1,11 @@
+# /etc/ravintopolku/palvelin.toml (root:ravintopolku 0640), aiops ADR-0016. Malli; oikea tiedosto ei ole repossa.
+[palvelin]
+rp_id = "tyoasema.tailnet.ts.net"
+tietokanta = "/srv/aiops/ravintopolku/paivakirja.sqlite"
+varmistus = "/srv/aiops/ravintopolku/varmistus"
+julkinen = "/srv/aiops/data/public/ravintopolku/paivakirja.json"
+sovellus = "/opt/ravintopolku/dist"
+
+[palvelin.kayttajat]
+# Sama lista kuin /etc/aiops/aiops.toml:n [gateway.kayttajat]
+"tunnus@github" = "elias"
