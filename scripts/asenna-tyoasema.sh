@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # =====================================================================
-# asenna-tyoasema.sh: kääntää Ravintopolun päiväkirjan kertakäyttöisissä konteissa ja asentaa staattiset
-# tiedostot hakemistoon /opt/ravintopolku/dist (aiops ADR-0014, vaihe R1).
+# asenna-tyoasema.sh: kääntää Ravintopolun päiväkirjan kertakäyttöisissä konteissa, asentaa staattiset tiedostot
+# hakemistoon /opt/ravintopolku/dist (aiops ADR-0014) ja synkronointipalvelimen hakemistoon /opt/ravintopolku/palvelin
+# sekä palvelutiedoston ravintopolku.service (aiops ADR-0016, R2).
 #
-# Käyttö repon juuresta:   sudo scripts/asenna-tyoasema.sh
+# Käyttö repon juuresta:   sudo scripts/asenna-tyoasema.sh "$(command -v uv)"
 #
 #   - Vain commitoitu koodi (git archive HEAD). Likainen työpuu pysäyttää asennuksen.
 #   - Kolme konttiajoa samasta tiivisteellä kiinnitetystä Node-imagesta, käyttäjänä 1000, ilman oikeuksia
@@ -12,18 +13,24 @@
 #       2) npm test ilman verkkoa,
 #       3) npm run build ilman verkkoa (tyyppitarkistus ja Vite-käännös).
 #   - Tulos: vain dist/ hakemistoon /opt/ravintopolku/dist (root, 0755/0644) ja tiedosto DEPLOYED.
-#   - Ei palvelinta, ei .env-tiedostoa, ei avaimia eikä Serve-muutosta. Tailscale Serve tarjoilee hakemiston
-#     portissa 8443 erillisenä isäntämuutoksena (aiops-repon muutosloki).
+#   - Palvelin: vain commitoitu koodi, uv sync --frozen --no-dev, root omistaa koodin, palvelukäyttäjä ravintopolku.
+#     Käynnissä ollut palvelu pysäytetään vaihdon ajaksi ja käynnistetään sen jälkeen; pysäytettyä ei käynnistetä.
+#   - Skripti ei luo käyttäjää, hakemistoja, konfiguraatiota eikä Serve-ohjausta: ne ovat isäntämuutoksia
+#     (aiops-repon muutosloki).
 # =====================================================================
 set -euo pipefail
 
 IMAGE="node:24.19.0-bookworm-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df"
 TARGET=/opt/ravintopolku
+UNIT=ravintopolku.service
+UV="${1:-}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 GIT=(git -c "safe.directory=$REPO" -C "$REPO")
 
 [ "$(id -u)" -eq 0 ] || { echo "Aja sudolla: sudo scripts/asenna-tyoasema.sh" >&2; exit 1; }
-[ $# -eq 0 ] || { echo "Skripti ei ota argumentteja." >&2; exit 1; }
+[ -x "$UV" ] || { echo "Anna uv:n polku: sudo scripts/asenna-tyoasema.sh \"\$(command -v uv)\"" >&2; exit 1; }
+[ $# -le 1 ] || { echo "Tuntematon argumentti: $2" >&2; exit 1; }
+getent passwd ravintopolku >/dev/null || { echo "Käyttäjää ravintopolku ei ole (aiops-muutosloki, vaihe R2)." >&2; exit 1; }
 if [ -n "$("${GIT[@]}" status --porcelain)" ]; then
   echo "Repossa on tallentamattomia muutoksia. Commitoi ensin: asennetaan vain commitoitu koodi." >&2
   "${GIT[@]}" status --short >&2
@@ -66,6 +73,30 @@ chmod -R u=rwX,go=rX "$TARGET/dist.uusi"
 if [ -d "$TARGET/dist" ]; then mv "$TARGET/dist" "$TARGET/dist.vanha"; fi
 mv "$TARGET/dist.uusi" "$TARGET/dist"
 rm -rf "$TARGET/dist.vanha"
+WAS_ACTIVE=0
+if systemctl is-active --quiet "$UNIT"; then
+  WAS_ACTIVE=1
+  echo "Pysäytetään $UNIT vaihdon ajaksi"
+  systemctl stop "$UNIT"
+fi
+rm -rf "$TARGET/palvelin"
+install -d -o root -g root -m 0755 "$TARGET/palvelin"
+cp -r "$STAGE/palvelin/src" "$STAGE/palvelin/pyproject.toml" "$STAGE/palvelin/uv.lock" "$STAGE/palvelin/.python-version" "$TARGET/palvelin/"
+(cd "$TARGET/palvelin" && "$UV" sync --frozen --no-dev --no-editable --python /usr/bin/python3.12 --quiet)
+chown -R root:root "$TARGET/palvelin"
+chmod -R u=rwX,go=rX "$TARGET/palvelin"
+(cd / && sudo -u ravintopolku "$TARGET/palvelin/.venv/bin/ravintopolku-palvelin" --help >/dev/null)
+echo "OK: ravintopolku pystyy käynnistämään palvelimen"
+install -o root -g root -m 0644 "$STAGE/config/systemd/$UNIT" "/etc/systemd/system/$UNIT"
+systemctl daemon-reload
 echo "$COMMIT $(date -Iseconds)" > "$TARGET/DEPLOYED"
 chmod 0644 "$TARGET/DEPLOYED"
+if [ "$WAS_ACTIVE" -eq 1 ]; then
+  systemctl start "$UNIT"
+  sleep 3
+  systemctl is-active --quiet "$UNIT" || { echo "VIRHE: $UNIT ei käynnistynyt: sudo journalctl -u $UNIT -n 50" >&2; exit 1; }
+  echo "OK: $UNIT käynnistetty uudelleen"
+else
+  echo "$UNIT ei ollut käynnissä, joten se jää pysäytetyksi. Käynnistys: sudo systemctl enable --now $UNIT"
+fi
 echo "Valmis: $(cat "$TARGET/DEPLOYED"), $(find "$TARGET/dist" -type f | wc -l) tiedostoa hakemistossa $TARGET/dist"

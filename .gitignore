@@ -33,3 +33,9 @@ server-state/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Synkronointipalvelin (aiops ADR-0016)
+palvelin/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

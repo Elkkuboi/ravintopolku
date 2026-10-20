@@ -1,4 +1,5 @@
 import { AIConnection } from "./AIConnection";
+import { SyncPanel } from "./SyncPanel";
 import { IntegrationInbox } from "./IntegrationInbox";
 import { useAIStatus } from "../ai/useAIStatus";
 import { type InboxItem } from "../ai/contracts";
@@ -290,6 +291,7 @@ export function SettingsView({
           ))}
         </div>
       </section>
+      <SyncPanel />
       <section className="card">
         <h2>Tallennuksen tila</h2>
         <p className="muted small">
