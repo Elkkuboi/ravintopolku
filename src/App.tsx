@@ -52,6 +52,7 @@ import { ProfileForm } from "./components/ProfileForm";
 import { FoodForm } from "./components/FoodForm";
 import { MealEditor } from "./components/MealEditor";
 import { WeightForm, LifestyleForm } from "./components/DailyForms";
+import { MakroMittarit } from "./components/MakroMittarit";
 const Progress = lazy(() =>
   import("./components/Progress").then((m) => ({ default: m.Progress })),
 );
@@ -417,6 +418,7 @@ export default function App() {
                     </button>
                   )}
                 </div>
+                <MakroMittarit totals={totals} goal={goal} />
                 <div className="dashboard-grid">
                   <section className="card energy-card">
                     <div className="section-heading">
@@ -437,25 +439,6 @@ export default function App() {
                         ? ` · tavoite ${formatNumber(goal.nutrients.energy, 0)} kcal`
                         : ""}
                     </p>
-                    {goal?.nutrients.energy !== null &&
-                      goal?.nutrients.energy !== undefined &&
-                      totals.energy.value !== null && (
-                        <>
-                          <div
-                            className="progress-track"
-                            aria-label="Energia suhteessa omaan tavoitteeseen"
-                          >
-                            <span
-                              style={{
-                                width: `${goal.nutrients.energy === 0 ? 100 : Math.min(100, (totals.energy.value / goal.nutrients.energy) * 100)}%`,
-                              }}
-                            />
-                          </div>
-                          <p className="small muted">
-                            Oma tavoite on vertailukohta.
-                          </p>
-                        </>
-                      )}
                     <div className="coverage">
                       <span
                         className={
