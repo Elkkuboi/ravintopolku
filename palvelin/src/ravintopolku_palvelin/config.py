@@ -15,6 +15,7 @@ _NAME = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 _LOGIN = re.compile(r"^[!-~]{1,254}$")
 _PATH = re.compile(r"^(/[A-Za-z0-9._-]+)+$")
 POLUT = ("tietokanta", "varmistus", "julkinen", "sovellus")
+VALINNAISET_POLUT = ("luonnokset",)  # Ilmarin luonnosten pudotushakemisto (aiops ADR-0026); puuttuva = ei käytössä
 
 
 class Virhe(Exception):
@@ -29,6 +30,7 @@ class Asetukset:
     varmistus: Path
     julkinen: Path
     sovellus: Path
+    luonnokset: Path | None = None
 
     @property
     def alkupera(self) -> str:
@@ -42,14 +44,16 @@ def jasenna(data: dict) -> Asetukset:
     p = data.get("palvelin")
     if not isinstance(p, dict):
         raise Virhe("[palvelin] puuttuu")
-    for avain in sorted(set(p) - {"rp_id", "kayttajat", *POLUT}):
+    for avain in sorted(set(p) - {"rp_id", "kayttajat", *POLUT, *VALINNAISET_POLUT}):
         ongelmat.append(f"[palvelin]: tuntematon avain {avain!r}")
     rp = p.get("rp_id")
     if not isinstance(rp, str) or not _HOSTNAME.fullmatch(rp):
         ongelmat.append("[palvelin] rp_id: nimi pienillä kirjaimilla ilman porttia")
     polut = {}
-    for nimi in POLUT:
+    for nimi in POLUT + VALINNAISET_POLUT:
         arvo = p.get(nimi)
+        if nimi in VALINNAISET_POLUT and nimi not in p:
+            continue
         if not isinstance(arvo, str) or not _PATH.fullmatch(arvo) or {".", ".."} & set(arvo.split("/")):
             ongelmat.append(f"[palvelin] {nimi}: absoluuttinen polku ilman '.'- ja '..'-osia")
         else:
