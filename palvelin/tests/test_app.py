@@ -1,6 +1,8 @@
-"""Palvelimen vartija, rajapinta ja turvaotsakkeet (ADR-0016 kohta 2). Otsaketaulukko käsin kirjoitettu."""
+"""Palvelimen vartija, rajapinta ja turvaotsakkeet (ADR-0016 kohta 2) sekä luonnoslaatikko (ADR-0026).
+Otsaketaulukko käsin kirjoitettu."""
 
 import json
+import time
 from types import MappingProxyType
 
 import pytest
@@ -8,6 +10,8 @@ from starlette.testclient import TestClient
 
 from ravintopolku_palvelin.app import CSP, luo
 from ravintopolku_palvelin.config import Asetukset
+
+from test_luonnokset import kuori
 
 RP = "tyoasema.taild1a5b7.ts.net"
 ALKUPERA = f"https://{RP}:8443"
@@ -23,18 +27,25 @@ def polut(tmp_path):
     (dist / "sw.js").write_text("// sw")
     (dist / "manifest.webmanifest").write_text("{}")
     (dist / "assets" / "a.js").write_text("console.log(1)")
-    for h in ("varmistus", "julkinen"):
+    for h in ("varmistus", "julkinen", "luonnokset"):
         (tmp_path / h).mkdir()
     return tmp_path
 
 
+def asetukset(polut, **lisaa):
+    return Asetukset(**{"rp_id": RP, "kayttajat": MappingProxyType({"Elkkuboi@github": "elias"}),
+                        "tietokanta": polut / "p.sqlite", "varmistus": polut / "varmistus",
+                        "julkinen": polut / "julkinen" / "paivakirja.json", "sovellus": polut / "dist", **lisaa})
+
+
 @pytest.fixture
 def client(polut):
-    a = Asetukset(rp_id=RP, kayttajat=MappingProxyType({"Elkkuboi@github": "elias"}),
-                  tietokanta=polut / "p.sqlite", varmistus=polut / "varmistus",
-                  julkinen=polut / "julkinen" / "paivakirja.json", sovellus=polut / "dist")
-    with TestClient(luo(a), base_url="http://localhost", client=None) as c:
+    with TestClient(luo(asetukset(polut, luonnokset=polut / "luonnokset")), base_url="http://localhost", client=None) as c:
         yield c
+
+
+def pudota(polut, nimi, sisalto):
+    (polut / "luonnokset" / nimi).write_text(json.dumps(sisalto), encoding="utf-8")
 
 
 def _ilman(*nimet):
@@ -71,9 +82,7 @@ def test_post_otsaketaulukko(client, kuvaus, otsakkeet, odotettu):
 def test_tcp_asiakas_ja_metodit(polut, client):
     assert client.put("/api/synk", headers=POST_OK).status_code == 405
     assert client.get("/api/synk", headers={**OK, "sec-fetch-site": "cross-site"}).status_code == 403
-    a = Asetukset(rp_id=RP, kayttajat=MappingProxyType({"Elkkuboi@github": "elias"}),
-                  tietokanta=polut / "q.sqlite", varmistus=polut / "varmistus",
-                  julkinen=polut / "julkinen" / "x.json", sovellus=polut / "dist")
+    a = asetukset(polut, tietokanta=polut / "q.sqlite", julkinen=polut / "julkinen" / "x.json")
     with TestClient(luo(a), base_url="http://localhost") as tcp:  # oletusasiakas on TCP-osoite
         assert tcp.get("/", headers=OK).status_code == 403
 
@@ -121,3 +130,51 @@ def test_vientirajoitus_viivastyttaa_mutta_ei_estä(client, polut):
     muutos = {"jalkeen": 0, "muutokset": [{"taulu": "foods", "id": "f1", "data": {"id": "f1"}}]}
     assert client.post("/api/synk", headers=POST_OK, content=json.dumps(muutos)).status_code == 200
     assert json.loads((polut / "julkinen" / "paivakirja.json").read_text())["taulut"]["foods"] == []
+
+
+def test_luonnoslaatikko_lukee_pudotuksen_ja_kuittaa(client, polut):
+    assert client.get("/api/luonnokset", headers=OK).json() == {"luonnokset": []}
+    pudota(polut, "20261028-120000-job-1.json", kuori("job-1"))
+    pudota(polut, "20261028-120001-job-2.json", kuori("job-2", dataClass="restricted"))
+    laatikko = client.get("/api/luonnokset", headers=OK).json()["luonnokset"]  # haku noutaa tiedostot heti
+    assert [(l["id"], l["externalId"], l["source"]) for l in laatikko] == [(1, "job-1", "ilmari")]
+    assert laatikko[0]["draft"]["name"] == "Kaurapuuro ja marjat" and set(laatikko[0]) == {
+        "id", "externalId", "source", "saapunut", "draft"}
+    assert sorted(p.name for p in (polut / "luonnokset").iterdir()) == ["hylatyt"]
+    assert (polut / "luonnokset" / "hylatyt" / "20261028-120001-job-2.json.syy.txt").exists()
+    assert client.delete("/api/luonnokset/1", headers=POST_OK).json() == {"ok": True}
+    assert client.delete("/api/luonnokset/1", headers=POST_OK).status_code == 404
+    assert client.delete("/api/luonnokset/7", headers=POST_OK).status_code == 404
+    assert client.delete("/api/luonnokset/abc", headers=POST_OK).status_code == 404
+    assert client.get("/api/luonnokset", headers=OK).json() == {"luonnokset": []}
+    assert client.get("/api/luonnokset", headers=OK).headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("kuvaus,otsakkeet,odotettu", [
+    ("oma alkuperä", POST_OK, 404),
+    ("ei tunnusta", {k: v for k, v in POST_OK.items() if k != "tailscale-user-login"}, 403),
+    ("ei Originia", {k: v for k, v in POST_OK.items() if k != "origin"}, 403),
+    ("vieras alkuperä", {**POST_OK, "origin": "https://paha.example"}, 403),
+    ("same-site", {**POST_OK, "sec-fetch-site": "same-site"}, 403),
+    ("Funnel", {**POST_OK, "tailscale-funnel-request": "?1"}, 403),
+])
+def test_delete_otsaketaulukko(client, kuvaus, otsakkeet, odotettu):
+    assert client.delete("/api/luonnokset/1", headers=otsakkeet).status_code == odotettu
+    assert client.delete("/api/synk", headers=otsakkeet).status_code in (403, 404)  # ei DELETE-reittiä
+
+
+def test_huoltosilmukka_noutaa_kaynnistyksessa(polut):
+    pudota(polut, "20261028-120000-job-9.json", kuori("job-9"))
+    with TestClient(luo(asetukset(polut, luonnokset=polut / "luonnokset")), base_url="http://localhost", client=None) as c:
+        raja = time.monotonic() + 5
+        while (polut / "luonnokset" / "20261028-120000-job-9.json").exists() and time.monotonic() < raja:
+            time.sleep(0.05)  # huoltosilmukka ajaa taustalla heti käynnistyksessä
+        assert not (polut / "luonnokset" / "20261028-120000-job-9.json").exists()
+        assert [l["externalId"] for l in c.get("/api/luonnokset", headers=OK).json()["luonnokset"]] == ["job-9"]
+
+
+def test_ilman_pudotushakemistoa_laatikko_on_tyhja(polut):
+    pudota(polut, "20261028-120000-job-9.json", kuori("job-9"))
+    with TestClient(luo(asetukset(polut)), base_url="http://localhost", client=None) as c:
+        assert c.get("/api/luonnokset", headers=OK).json() == {"luonnokset": []}
+        assert (polut / "luonnokset" / "20261028-120000-job-9.json").exists()

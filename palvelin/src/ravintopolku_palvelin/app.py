@@ -2,7 +2,8 @@
 
 Palvelin kuuntelee vain Unix-soketissa, johon Tailscale Serve ohjaa portin 8443. Tunnistus kuten Ilmari Hubissa: osoite
 (X-Forwarded-Host tai Host), Tailscale-tunnus sallittujen listalla, Funnel hylätään ja otsakkeiden toistot hylätään.
-POST hyväksytään vain omasta alkuperästä. Rajapinnassa ei ole verkkoa eikä salaisuuksia.
+POST ja DELETE hyväksytään vain omasta alkuperästä. Rajapinnassa ei ole verkkoa eikä salaisuuksia. Ilmarin
+aterialuonnokset luetaan pudotushakemistosta (aiops ADR-0026) ja tarjoillaan laatikkoon /api/luonnokset.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import kanta
+from . import kanta, luonnokset
 from .config import PORTTI, Asetukset
 
 PYYNTO_MAX = 1024 * 1024
@@ -42,7 +43,7 @@ def hylkays(request: Request, a: Asetukset) -> tuple[int, str] | None:
     o = request.scope.get("headers", [])
     if request.scope.get("client") is not None:
         return 403, "vain Unix-soketti"
-    if request.method not in ("GET", "HEAD", "POST"):
+    if request.method not in ("GET", "HEAD", "POST", "DELETE"):
         return 405, "metodi ei sallittu"
     xfh, host = _arvot(o, b"x-forwarded-host"), _arvot(o, b"host")
     if len(xfh) > 1 or len(host) > 1:
@@ -60,12 +61,12 @@ def hylkays(request: Request, a: Asetukset) -> tuple[int, str] | None:
         return 403, "Sec-Fetch-Site ei ole yksikäsitteinen"
     if request.url.path.startswith("/api/") and sivusto and sivusto[0] not in (b"same-origin", b"none"):
         return 403, "rajapinta vain omasta alkuperästä"
-    if request.method == "POST":
+    if request.method in ("POST", "DELETE"):
         alkupera = _arvot(o, b"origin")
         if len(alkupera) != 1 or alkupera[0] != a.alkupera.encode("ascii"):
-            return 403, "POST vain omasta alkuperästä"
+            return 403, f"{request.method} vain omasta alkuperästä"
         if sivusto and sivusto[0] != b"same-origin":
-            return 403, "POST vain omasta alkuperästä"
+            return 403, f"{request.method} vain omasta alkuperästä"
     return None
 
 
@@ -78,11 +79,18 @@ def luo(a: Asetukset) -> Starlette:
         await run_in_threadpool(kanta.vie, yhteys, a.julkinen)
         tila["likainen"], tila["viety"] = False, time.monotonic()
 
+    async def nouda_luonnokset() -> None:
+        """Kutsujalla on lukko. Pudotushakemisto luetaan vain, jos se on konfiguroitu; vanhentaminen tehdään aina."""
+        await run_in_threadpool(kanta.luonnokset_vanhenna, yhteys)
+        if a.luonnokset is not None:
+            await run_in_threadpool(luonnokset.nouda, yhteys, a.luonnokset)
+
     async def huolto() -> None:
         async with lukko:
             await run_in_threadpool(kanta.varmista, yhteys, a.varmistus)
             if tila["likainen"]:
                 await kirjoita_vienti()
+            await nouda_luonnokset()
 
     async def silmukka() -> None:
         while True:
@@ -150,6 +158,19 @@ def luo(a: Asetukset) -> Starlette:
             return JSONResponse({"virhe": str(e)}, status_code=400)
         return JSONResponse({"kuitatut": kuitatut, "muutokset": muutokset, "lisaa": lisaa, "seq": seq})
 
+    async def api_luonnokset(request: Request) -> Response:
+        async with lukko:
+            await nouda_luonnokset()
+            odottavat = await run_in_threadpool(kanta.luonnokset_odottavat, yhteys)
+        return JSONResponse({"luonnokset": odottavat})
+
+    async def api_luonnos_valmis(request: Request) -> Response:
+        async with lukko:
+            loytyi = await run_in_threadpool(kanta.luonnos_valmis, yhteys, request.path_params["id"])
+        if not loytyi:
+            return JSONResponse({"virhe": "luonnosta ei ole odottamassa"}, status_code=404)
+        return JSONResponse({"ok": True})
+
     async def api_tuntematon(request: Request) -> Response:
         return JSONResponse({"virhe": "ei rajapintaa"}, status_code=404)
 
@@ -169,7 +190,9 @@ def luo(a: Asetukset) -> Starlette:
         Route("/api/tila", api_tila, methods=["GET"]),
         Route("/api/synk", api_hae, methods=["GET"]),
         Route("/api/synk", api_synk, methods=["POST"]),
-        Route("/api/{polku:path}", api_tuntematon, methods=["GET", "POST"]),
+        Route("/api/luonnokset", api_luonnokset, methods=["GET"]),
+        Route("/api/luonnokset/{id:int}", api_luonnos_valmis, methods=["DELETE"]),
+        Route("/api/{polku:path}", api_tuntematon, methods=["GET", "POST", "DELETE"]),
         Mount("/", app=StaticFiles(directory=str(a.sovellus), html=True, check_dir=False)),
     ], middleware=[Middleware(BaseHTTPMiddleware, dispatch=vartija)], lifespan=elinkaari)
     return sovellus
