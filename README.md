@@ -134,3 +134,13 @@ Asennus: lisää `luonnokset = "/srv/aiops/ravintopolku/luonnokset"` tiedostoon 
 `sudo install -d -o aiops-gw -g ravintopolku -m 2770 /srv/aiops/ravintopolku/luonnokset` ja käynnistä palvelu uudelleen
 (`sudo systemctl restart ravintopolku.service`). Kelvottomat tiedostot jäävät alihakemistoon `hylatyt/` syineen.
 Tiedostomuoto ja säännöt: [ILMARI-integraatio](docs/ilmari-integration.md).
+
+## Kuvasta ateria (aiops ADR-0027)
+
+Kotinäkymän **Kuvaa ateria** luo aterian pelkästä kuvasta – ruoka-annoksesta tai pakkauksen takaetiketistä (arvot
+per 100 g ja pakkauksen paino) – eikä vaadi muita kenttiä. Työaseman palvelin lähettää kuvan aiops-välittäjälle
+Unix-soketissa; välittäjän rooli valitaan Asetukset → Kuvantulkinta (Hubin valinta, pilvi tai paikallinen malli) tai
+Ilmari Hubista. Ateria tallentuu heti alkuperällä `Kuvasta (rooli X)` ja mallin oletuksilla; ilmoituksen **Avaa** avaa
+sen muokattavaksi. Asennus: lisää `valittaja = "/run/aiops-valittaja/valittaja.sock"` tiedostoon
+`/etc/ravintopolku/palvelin.toml` ja käynnistä palvelu uudelleen. Sopimus, roolit ja rajat:
+[ILMARI-integraatio](docs/ilmari-integration.md#kuvasta-ateria-aiops-adr-0027).

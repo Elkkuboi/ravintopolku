@@ -55,4 +55,10 @@ jonka Python-palvelin lukee huoltosilmukassa, tarkistaa samoin säännöin ja ta
 Tailscale-tunnistuksella (aiops ADR-0026). Sovelluksen luonnoslaatikko käyttää tätä reittiä; Node-palvelimen `/api/inbox`
 jää sen omaksi reitiksi.
 
+Kuvasta ateria (aiops ADR-0027): `src/ai/kuva-ateria.ts` lähettää kuvan reitille `/api/kuva-ateria`, ja Python-palvelimen
+`kuva.py` kutsuu aiops-välittäjää Unix-soketissa (rooli `kuva_tulkki*` model-kenttänä), muuntaa mallin JSONin
+AIDraft-luonnokseksi ja tarkistaa sen `luonnokset.tarkista_luonnos`-säännöillä. Sovellus luo aterian heti IndexedDB:hen
+samalla `saveMeal`-polulla kuin lomake; snapshot lasketaan `nutrition.ts`:ssä. Tämä on ainoa toiminto, jossa AI:n luonnos
+tallentuu ilman lomakkeen tarkistusta; alkuperä ja oletukset jäävät ateriaan näkyviin.
+
 Katso [AI-integraatio](ai-integration.md) ja [ILMARI-sopimus ja live-työn rajat](ilmari-integration.md). Tuleva aiops-adapteri ei saa ohittaa gatewayta, politiikkaa tai hyväksyntää. Tämän version Node-palvelin on henkilökohtainen valinnainen API-välittäjä, ei yleiskäyttöinen agenttialusta tai usean laitteen synkronointipalvelu.
