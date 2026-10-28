@@ -1,5 +1,12 @@
 import { type AIDraft } from "./ai/provider";
 import { poistaLuonnos } from "./ai/luonnokset";
+import {
+  tulkitseKuva,
+  ateriaKuvasta,
+  OLETUSROOLI,
+  ROOLIN_NIMI,
+} from "./ai/kuva-ateria";
+import { compressPhoto } from "./data/photos";
 import { connectionChanged } from "./ai/useAIStatus";
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useAutoSync } from "./data/useAutoSync";
@@ -23,10 +30,12 @@ import {
   Utensils,
   Heart,
   Bookmark,
+  Camera,
 } from "lucide-react";
 import {
   type Meal,
   type Food,
+  type Photo,
   keys,
   labels,
   stamped,
@@ -63,6 +72,7 @@ const SettingsView = lazy(() =>
 );
 import { Modal, BlobImage } from "./components/common";
 type Tab = "today" | "diary" | "progress" | "settings";
+type Toast = { text: string; action?: { label: string; run: () => void } };
 type Dialog =
   | { kind: "profile" }
   | { kind: "meal"; meal?: Meal; initialDraft?: AIDraft; inboxId?: string }
@@ -85,7 +95,8 @@ export default function App() {
     [date, setDate] = useState(localDay()),
     [dialog, setDialog] = useState<Dialog>(null),
     [nestedFood, setNestedFood] = useState(false),
-    [toast, setToast] = useState(""),
+    [toast, setToast] = useState<Toast | null>(null),
+    [kuvaKesken, setKuvaKesken] = useState(false),
     [error, setError] = useState("");
   const {
     needRefresh: [needRefresh, setNeedRefresh],
@@ -93,7 +104,7 @@ export default function App() {
     updateServiceWorker,
   } = useRegisterSW();
   const data = demo ? example : real;
-  const notify = (s: string) => setToast(s);
+  const notify = (s: string) => setToast({ text: s });
   const run = async (f: () => Promise<void>) => {
     setError("");
     try {
@@ -117,7 +128,7 @@ export default function App() {
   };
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 6000);
+    const timer = setTimeout(() => setToast(null), toast.action ? 12000 : 6000);
     return () => clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
@@ -156,6 +167,31 @@ export default function App() {
     }
     setDialog(d);
   };
+  const kuvaRooli = data.settings[0]?.kuvantulkinta ?? OLETUSROOLI;
+  // Kuvasta ateria (aiops ADR-0027): kuva -> työaseman palvelin -> välittäjä -> ateria heti päiväkirjaan.
+  const kuvaaAteria = (file: File) =>
+    void run(async () => {
+      if (demo) return;
+      setKuvaKesken(true);
+      try {
+        let photo: Photo | null = null;
+        try {
+          photo = { ...stamped(), blob: await compressPhoto(file) };
+        } catch {
+          photo = null; // kuva lähetetään silti; ateriaan jää merkintä, ettei kuvaa tallennettu
+        }
+        const tulos = await tulkitseKuva(photo?.blob ?? file, kuvaRooli, date);
+        const meal = ateriaKuvasta(tulos, date, defaultMealTime(date), photo);
+        await saveMeal(meal, photo);
+        setToast({
+          text: "Ateria lisätty kuvasta – tarkista tarvittaessa",
+          action: { label: "Avaa", run: () => open({ kind: "meal", meal }) },
+        });
+        void navigator.storage?.persist?.().catch(() => {});
+      } finally {
+        setKuvaKesken(false);
+      }
+    });
   return (
     <div className="app-shell">
       <aside className="desktop-sidebar">
@@ -418,6 +454,46 @@ export default function App() {
                     </button>
                   )}
                 </div>
+                {!demo && (
+                  <section className="card kuva-ateria">
+                    <label
+                      className={
+                        "primary file-button" + (kuvaKesken ? " busy" : "")
+                      }
+                      aria-disabled={kuvaKesken}
+                    >
+                      <Camera size={20} />
+                      {kuvaKesken ? "Tulkitaan kuvaa…" : "Kuvaa ateria"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        disabled={kuvaKesken}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) kuvaaAteria(f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <div>
+                      {kuvaKesken ? (
+                        <p className="small" role="status">
+                          Kuva lähetetty tulkittavaksi. Tämä voi kestää 10–60
+                          sekuntia.
+                        </p>
+                      ) : (
+                        <p className="small muted">
+                          Ateria tai pakkauksen tuoteseloste yhdestä kuvasta,
+                          ilman muita kenttiä. Kuva lähetetään työaseman
+                          palvelimen kautta tulkittavaksi (
+                          {ROOLIN_NIMI[kuvaRooli]}
+                          ). Ateria tallentuu heti; voit muokata sitä.
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                )}
                 <MakroMittarit totals={totals} goal={goal} />
                 <div className="dashboard-grid">
                   <section className="card energy-card">
@@ -877,10 +953,22 @@ export default function App() {
       {toast && (
         <div className="toast" role="status">
           <Check size={18} />
-          {toast}
+          {toast.text}
+          {toast.action && (
+            <button
+              className="secondary toast-action"
+              onClick={() => {
+                const { run: avaa } = toast.action!;
+                setToast(null);
+                avaa();
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
           <button
             className="quiet"
-            onClick={() => setToast("")}
+            onClick={() => setToast(null)}
             aria-label="Sulje ilmoitus"
           >
             ×

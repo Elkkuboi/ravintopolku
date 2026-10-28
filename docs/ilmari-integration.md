@@ -103,6 +103,52 @@ poistetaan kannasta; tunniste säilyy toistojen torjuntaan.
 Asetuksista aterialomakkeeseen, ja tallennuksen jälkeen se kuittaa luonnoksen; ateriaan jää oletusrivi `ILMARI-luonnos: <id>`.
 Kuittaus on best effort: yhteysvirhe ei peru jo tallennettua ateriaa, ja luonnoksen voi merkitä käsitellyksi myöhemmin.
 
+## Kuvasta ateria (aiops ADR-0027)
+
+Ateria syntyy **pelkästä kuvasta** ilman pakollisia kenttiä: kotinäkymän **Kuvaa ateria** -painike avaa kameran (tai
+kuvan valinnan), lähettää kuvan työaseman palvelimelle ja tallentaa palautetun luonnoksen heti valitun päivän ateriaksi.
+Kuva voi olla ruoka-annos tai pakkauksen takaetiketti (ravintosisältö per 100 g ja pakkauksen paino). Ateriaan jää
+alkuperä `Kuvasta (rooli X)` ja mallin oletukset, puuttuvat tiedot ja kysymykset; ilmoituksen **Avaa** avaa aterian
+muokattavaksi. Pienennetty kuva tallentuu laitteelle kuten muissakin aterioissa (ei synkronoidu).
+
+**Reitti.** Palvelin (`palvelin/`, ADR-0025) kutsuu aiops-välittäjää ("valittaja") Unix-soketissa, joka konfiguroidaan
+riville `valittaja = "/run/aiops-valittaja/valittaja.sock"` (`/etc/ravintopolku/palvelin.toml`; malli
+`config/palvelin.toml.esimerkki`). Ilman riviä reitti vastaa 404 ja sovellus kertoo, ettei toiminto ole käytössä.
+Palvelimen sandboxissa on `PrivateNetwork=yes` ja vain `AF_UNIX`, joten palvelimella ei ole verkkoa, avaimia eikä
+mallivalintaa: välittäjä hoitaa budjetin, politiikan ja mallin. Soketin pitää olla `ravintopolku`-käyttäjän
+yhdistettävissä (välittäjän oma asennus, aiops-repon isäntämuutos).
+
+**Välittäjäkutsu.** `POST /v1/chat/completions` OpenAI-muotoisena JSONina: `model` on **rooli**, ei malli –
+`kuva_tulkki` (Hubin valinta: Hub päättää roolin takana olevan mallin), `kuva_tulkki_pilvi` (pakota pilvimalli) tai
+`kuva_tulkki_paikallinen` (pakota paikallinen malli). Yksi `user`-viesti, jossa tekstiosa (suomenkielinen kehote) ja
+kuvaosa `{"type":"image_url","image_url":{"url":"data:image/jpeg;base64,…"}}`, sekä `response_format:
+{"type":"json_object"}`. Aikaraja 120 s, enintään kaksi samanaikaista kutsua. Vastaus on chat-completions-JSON
+(`choices[0].message.content`) tai virheolio `{"error":{"message","type"}}`: 402 viikkobudjetti ylittynyt, 404 roolille
+ei mallia, 501/503 ei käytettävissä, 502 malli epäonnistui. Jokainen muu kuin 200 näytetään käyttäjälle
+suomenkielisenä viestinä (välittäjän oma viesti lyhennettynä perässä), eikä mitään tallenneta.
+
+**Mallin sopimus.** Malli palauttaa vain JSON-olion `{"name", "kind": "ateria"|"tuoteseloste", "lines": [{"name",
+"mode": "per100"|"portion", "grams": luku|null, "values": {"energy","protein","carbs","fat","fiber"} luku|null}],
+"assumptions": [..], "questions": [..]}`. Ruokakuvasta jokainen näkyvä ruoka on `portion`-rivi realistisella
+suomalaisella annoskoolla; tuoteselosteesta palautetaan **yksi** `per100`-rivi, jonka `values` ovat per 100 g ja
+`grams` pakkauksen paino tai ilmoitettu annos. Palvelin jäsentää tekstin puolustavasti (koodiaidat pois, ensimmäisestä
+`{` viimeiseen `}`), muuntaa luvut (merkkijonot ja desimaalipilkku kelpaavat, muu on tuntematon), leikkaa arvot
+välille 0–100 000, rajaa rivit 30:een, antaa massattomalle `per100`-riville 100 g oletuksella ja tarkistaa lopputuloksen
+samoilla säännöillä kuin Ilmarin luonnokset (`luonnokset.tarkista_luonnos`). Tuntematon arvo on null, ei koskaan 0.
+Rivi ilman yhtäkään arvoa hylätään; jos rivejä ei jää, vastaus on 422.
+
+**Rajapinta sovellukselle.** `POST /api/kuva-ateria`, `multipart/form-data` (sama Tailscale-tunnistus ja
+Origin-sääntö kuin muilla `/api`-reiteillä): kenttä `kuva` (JPEG/PNG/WebP taikatavuista tunnistettuna, enintään
+8 MiB), valinnaiset `rooli` (oletus `kuva_tulkki`), `pvm` (VVVV-KK-PP, palautetaan sellaisenaan) ja `vihje` (enintään
+300 merkkiä, liitetään kehotteeseen datana). Vastaus `{"draft": AIDraft (schemaVersion 1), "kind", "rooli", "pvm"}`;
+`draft.provenance.provider` on `aiops-välittäjä / <rooli>` ja `model` välittäjän ilmoittama malli. Virheet: 400 kelvoton
+kenttä tai kuva, 404 toiminto ei käytössä, 413 liian suuri, 415 väärä sisältötyyppi, 422 kuvasta ei saatu ateriaa,
+402/502/503/504 välittäjästä. Lokiin kirjataan rooli, tila ja kesto – ei kuvaa eikä mallin tekstiä.
+
+**Roolin valinta.** Asetukset → Kuvantulkinta: Hubin valinta, Pilvi tai Paikallinen. Valinta tallentuu päiväkirjan
+`settings`-tauluun (`kuvantulkinta`, puuttuva = `kuva_tulkki`) ja synkronoituu laitteiden välillä; sama vaihto on
+Ilmari Hubissa. Node-palvelimella (`server/`) reittiä ei ole.
+
 ## Live-aiopsiin kytkeminen: jäljellä oleva työ
 
 1. Hanki aiopsin lähdekoodi luettavaksi ja lue sen AGENTS.md, ADR-0003/0007/0010, gatewayn reitit ja job/tulosskeemat. Varmista nykyinen asennettu versio; toimitettu tilannekuva ei korvaa tarkastusta.

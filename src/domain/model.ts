@@ -162,8 +162,18 @@ export const dayStatusSchema = z
   .object({ ...stamp, date: daySchema, complete: z.boolean() })
   .strict();
 export type DayStatus = z.infer<typeof dayStatusSchema>;
+// kuvantulkinta: Kuvasta ateria -toiminnon rooli aiops-välittäjälle (ADR-0027); puuttuva = kuva_tulkki (Hubin valinta).
+export const kuvaRooliSchema = z.enum([
+  "kuva_tulkki",
+  "kuva_tulkki_pilvi",
+  "kuva_tulkki_paikallinen",
+]);
 export const settingsSchema = z
-  .object({ ...stamp, theme: z.enum(["light", "dark", "system"]) })
+  .object({
+    ...stamp,
+    theme: z.enum(["light", "dark", "system"]),
+    kuvantulkinta: kuvaRooliSchema.optional(),
+  })
   .strict();
 export type Settings = z.infer<typeof settingsSchema>;
 export interface Photo {

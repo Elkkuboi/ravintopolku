@@ -7,6 +7,8 @@ julkinen = "/srv/aiops/data/public/ravintopolku/paivakirja.json"
 sovellus = "/opt/ravintopolku/dist"
 # Valinnainen: Ilmarin aterialuonnosten pudotushakemisto (aiops ADR-0026). Ilman riviä laatikko ei lue tiedostoja.
 luonnokset = "/srv/aiops/ravintopolku/luonnokset"
+# Valinnainen: aiops-välittäjän Unix-soketti (aiops ADR-0025/-0027). Ilman riviä "Kuvaa ateria" ei ole käytössä.
+valittaja = "/run/aiops-valittaja/valittaja.sock"
 
 [palvelin.kayttajat]
 # Sama lista kuin /etc/aiops/aiops.toml:n [gateway.kayttajat]

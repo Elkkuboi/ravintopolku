@@ -1095,6 +1095,34 @@ details ul {
 .toast svg {
   flex-shrink: 0;
 }
+.toast .toast-action {
+  min-height: 32px;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+.kuva-ateria {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.kuva-ateria .file-button {
+  padding: 12px 20px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.kuva-ateria .file-button.busy {
+  opacity: 0.7;
+  cursor: progress;
+}
+.kuva-ateria > div {
+  flex: 1 1 240px;
+}
+.kuva-ateria p {
+  margin: 0;
+}
 .toast .quiet {
   color: var(--card);
   padding: 5px;

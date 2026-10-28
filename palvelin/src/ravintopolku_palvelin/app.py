@@ -3,7 +3,9 @@
 Palvelin kuuntelee vain Unix-soketissa, johon Tailscale Serve ohjaa portin 8443. Tunnistus kuten Ilmari Hubissa: osoite
 (X-Forwarded-Host tai Host), Tailscale-tunnus sallittujen listalla, Funnel hylätään ja otsakkeiden toistot hylätään.
 POST ja DELETE hyväksytään vain omasta alkuperästä. Rajapinnassa ei ole verkkoa eikä salaisuuksia. Ilmarin
-aterialuonnokset luetaan pudotushakemistosta (aiops ADR-0026) ja tarjoillaan laatikkoon /api/luonnokset.
+aterialuonnokset luetaan pudotushakemistosta (aiops ADR-0026) ja tarjoillaan laatikkoon /api/luonnokset. Kuvasta
+ateria (/api/kuva-ateria) kutsuu aiops-välittäjää Unix-soketissa (aiops ADR-0025/-0027); ilman konfiguroitua
+sokettia reitti vastaa 404.
 """
 
 from __future__ import annotations
@@ -23,10 +25,12 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import kanta, luonnokset
+from . import kanta, kuva, luonnokset
 from .config import PORTTI, Asetukset
 
 PYYNTO_MAX = 1024 * 1024
+KUVAPYYNTO_MAX = kuva.KUVA_MAX + 64 * 1024  # kuva ja lomakekentät multipart-kuorineen
+KUVAKUTSUJA_MAX = 2  # samanaikaisia välittäjäkutsuja
 VIENTI_VALI_S = 60.0  # julkinen kopio enintään kerran minuutissa
 HUOLTO_VALI_S = 60.0  # huoltosilmukka: varmistus ja viivästynyt vienti
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; "
@@ -73,6 +77,7 @@ def hylkays(request: Request, a: Asetukset) -> tuple[int, str] | None:
 def luo(a: Asetukset) -> Starlette:
     yhteys = kanta.avaa(a.tietokanta)
     lukko = asyncio.Lock()
+    kuvalukko = asyncio.Semaphore(KUVAKUTSUJA_MAX)
     tila = {"likainen": True, "viety": 0.0}
 
     async def kirjoita_vienti() -> None:
@@ -171,6 +176,24 @@ def luo(a: Asetukset) -> Starlette:
             return JSONResponse({"virhe": "luonnosta ei ole odottamassa"}, status_code=404)
         return JSONResponse({"ok": True})
 
+    async def api_kuva_ateria(request: Request) -> Response:
+        """Kuvasta ateria (aiops ADR-0027). Ei pidä synkronointilukkoa: välittäjäkutsu voi kestää minuutin."""
+        if a.valittaja is None:
+            return JSONResponse({"virhe": "kuvasta ateria ei ole käytössä tällä palvelimella"}, status_code=404)
+        runko = b""
+        async for pala in request.stream():
+            runko += pala
+            if len(runko) > KUVAPYYNTO_MAX:
+                return JSONResponse({"virhe": "kuva on yli 8 MiB"}, status_code=413)
+        try:
+            kentat = kuva.jasenna_multipart(request.headers.get("content-type", ""), runko)
+            data, mime, rooli, pvm, vihje = kuva.tarkista_pyynto(kentat)
+            async with kuvalukko:
+                tulos = await run_in_threadpool(kuva.tulkitse, str(a.valittaja), data, mime, rooli, vihje)
+        except kuva.Virhe as e:
+            return JSONResponse({"virhe": str(e)}, status_code=e.tila)
+        return JSONResponse({**tulos, "pvm": pvm})
+
     async def api_tuntematon(request: Request) -> Response:
         return JSONResponse({"virhe": "ei rajapintaa"}, status_code=404)
 
@@ -192,6 +215,7 @@ def luo(a: Asetukset) -> Starlette:
         Route("/api/synk", api_synk, methods=["POST"]),
         Route("/api/luonnokset", api_luonnokset, methods=["GET"]),
         Route("/api/luonnokset/{id:int}", api_luonnos_valmis, methods=["DELETE"]),
+        Route("/api/kuva-ateria", api_kuva_ateria, methods=["POST"]),
         Route("/api/{polku:path}", api_tuntematon, methods=["GET", "POST", "DELETE"]),
         Mount("/", app=StaticFiles(directory=str(a.sovellus), html=True, check_dir=False)),
     ], middleware=[Middleware(BaseHTTPMiddleware, dispatch=vartija)], lifespan=elinkaari)

@@ -14,6 +14,7 @@ import {
   Plus,
 } from "lucide-react";
 import { type Dataset, type Food, stamped } from "../domain/model";
+import { KUVA_ROOLIT, ROOLIN_NIMI, OLETUSROOLI } from "../ai/kuva-ateria";
 import { eraseAll, saveRecord, removeFood, removeTemplate } from "../data/db";
 import {
   exportBackup,
@@ -118,6 +119,7 @@ export function SettingsView({
             onChange={(e) =>
               void run(async () => {
                 await saveRecord("settings", {
+                  ...data.settings[0],
                   ...stamped(data.settings[0]),
                   theme: e.target.value as "light" | "dark" | "system",
                 });
@@ -128,6 +130,31 @@ export function SettingsView({
             <option value="system">Laitteen asetus</option>
             <option value="light">Vaalea</option>
             <option value="dark">Tumma</option>
+          </select>
+        </Field>
+        <Field
+          label="Kuvantulkinta"
+          hint="Kuvaa ateria -toiminnon malli: Hub päättää roolin takana olevan mallin, tai pakota pilvi tai paikallinen malli. Sama valinta on Ilmari Hubissa."
+        >
+          <select
+            value={data.settings[0]?.kuvantulkinta ?? OLETUSROOLI}
+            onChange={(e) =>
+              void run(async () => {
+                await saveRecord("settings", {
+                  ...data.settings[0],
+                  ...stamped(data.settings[0]),
+                  theme: data.settings[0]?.theme ?? "system",
+                  kuvantulkinta: e.target.value as (typeof KUVA_ROOLIT)[number],
+                });
+                notify("Kuvantulkinnan rooli tallennettu.");
+              })
+            }
+          >
+            {KUVA_ROOLIT.map((r) => (
+              <option key={r} value={r}>
+                {ROOLIN_NIMI[r]}
+              </option>
+            ))}
           </select>
         </Field>
       </section>

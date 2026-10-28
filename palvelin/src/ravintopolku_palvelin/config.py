@@ -15,7 +15,9 @@ _NAME = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 _LOGIN = re.compile(r"^[!-~]{1,254}$")
 _PATH = re.compile(r"^(/[A-Za-z0-9._-]+)+$")
 POLUT = ("tietokanta", "varmistus", "julkinen", "sovellus")
-VALINNAISET_POLUT = ("luonnokset",)  # Ilmarin luonnosten pudotushakemisto (aiops ADR-0026); puuttuva = ei käytössä
+# Valinnaiset polut; puuttuva = ominaisuus ei käytössä. luonnokset: Ilmarin luonnosten pudotushakemisto (aiops ADR-0026);
+# valittaja: aiops-välittäjän Unix-soketti kuvasta ateria -toiminnolle (aiops ADR-0025/-0027).
+VALINNAISET_POLUT = ("luonnokset", "valittaja")
 
 
 class Virhe(Exception):
@@ -31,6 +33,7 @@ class Asetukset:
     julkinen: Path
     sovellus: Path
     luonnokset: Path | None = None
+    valittaja: Path | None = None
 
     @property
     def alkupera(self) -> str:
