@@ -249,6 +249,22 @@ export async function createApp(
       throw new ServiceError(404, "Luonnosta ei löytynyt.");
     return { ok: true };
   });
+  // Sama laatikko työaseman palvelimen muodossa (aiops ADR-0026), jotta sovelluksen luonnoslaatikko toimii myös täällä.
+  app.get(prefix + "/luonnokset", async () => ({
+    luonnokset: store.list().map((item) => ({
+      id: item.id,
+      externalId: item.envelope.externalId,
+      source: item.envelope.source,
+      saapunut: item.receivedAt,
+      draft: item.envelope.draft,
+    })),
+  }));
+  app.delete(prefix + "/luonnokset/:id", async (request) => {
+    const { id } = z.object({ id: z.uuid() }).parse(request.params);
+    if (!store.dismiss(id))
+      throw new ServiceError(404, "Luonnosta ei löytynyt.");
+    return { ok: true };
+  });
   app.get(prefix + "/integrations/v1/schema", async () => ({
     schemaVersion: 1,
     draftSchema: aiJSONSchema,

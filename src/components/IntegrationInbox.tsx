@@ -50,7 +50,8 @@ export function IntegrationInbox({
       </p>
       {available === false && (
         <p className="muted small">
-          Luonnoslaatikko on käytettävissä vain työaseman palvelimen kautta.
+          Luonnoslaatikko on käytettävissä työaseman palvelimen kautta tai
+          kirjautuneena AI-palveluun.
         </p>
       )}
       {available && !items.length && (

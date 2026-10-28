@@ -399,6 +399,23 @@ describe("ILMARI-tulosrajapinta", () => {
     });
     expect(inbox.json()).toHaveLength(1);
     expect(inbox.json()[0].envelope.draft.name).toBe(draft.name);
+    const laatikko = await app.inject({
+      url: "/api/luonnokset",
+      headers,
+      cookies: { ravintopolku_session: token },
+    });
+    expect(laatikko.json().luonnokset).toEqual([
+      {
+        id: first.json().id,
+        externalId: payload.externalId,
+        source: payload.source,
+        saapunut: inbox.json()[0].receivedAt,
+        draft,
+      },
+    ]);
+    expect(
+      (await app.inject({ url: "/api/luonnokset", headers: h })).statusCode,
+    ).toBe(401);
     const dismissed = await app.inject({
       method: "DELETE",
       url: "/api/inbox/" + first.json().id,

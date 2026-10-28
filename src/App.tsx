@@ -103,7 +103,7 @@ export default function App() {
   };
   const saved = () => {
     if (dialog?.kind === "meal" && dialog.inboxId)
-      void poistaLuonnos(Number(dialog.inboxId))
+      void poistaLuonnos(dialog.inboxId)
         .then(() => connectionChanged())
         .catch(() =>
           notify(

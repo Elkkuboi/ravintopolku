@@ -17,7 +17,7 @@ export async function haeLuonnokset(hae: typeof fetch = fetch): Promise<LuonnosT
   } catch {
     return { tila: "virhe", viesti: "Työaseman palvelimeen ei saada yhteyttä." };
   }
-  if (r.status === 404) return { tila: "ei-palvelinta" };
+  if (r.status === 404 || r.status === 401) return { tila: "ei-palvelinta" }; // 401: Node ilman istuntoa
   if (!r.ok) return { tila: "virhe", viesti: `palvelin vastasi ${r.status}` };
   const tulos = luonnoksetSchema.safeParse(await r.json().catch(() => null));
   if (!tulos.success) return { tila: "virhe", viesti: "palvelimen vastaus ei kelpaa" };
@@ -25,12 +25,13 @@ export async function haeLuonnokset(hae: typeof fetch = fetch): Promise<LuonnosT
 }
 
 /** Merkitsee luonnoksen käsitellyksi palvelimella. Heittää virheen, jos kuittaus ei onnistunut. */
-export async function poistaLuonnos(id: number, hae: typeof fetch = fetch): Promise<void> {
+export async function poistaLuonnos(id: number | string, hae: typeof fetch = fetch): Promise<void> {
   let r: Response;
   try {
     r = await hae(`/api/luonnokset/${encodeURIComponent(String(id))}`, {
       method: "DELETE",
       credentials: "same-origin",
+      headers: { "X-Ravintopolku": "1" }, // Node-palvelimen vaatimus; työaseman palvelin ei välitä otsakkeesta
     });
   } catch {
     throw new Error("Työaseman palvelimeen ei saada yhteyttä.");
