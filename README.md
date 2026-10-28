@@ -124,3 +124,13 @@ myös saman päivän merkinnöissä, ja poistot säilyvät. Yli 25 poistoa kerra
 
 Palvelin ottaa päivittäisen varmuuskopion (30 päivää) ja kirjoittaa nykytilan julkiseen datahakemistoon Ilmarin luettavaksi.
 Testit: `cd palvelin && uv run --frozen pytest -q` ja `npm test`. Asennus: `sudo scripts/asenna-tyoasema.sh "$(command -v uv)"`.
+
+## ILMARIn luonnokset työasemalla (aiops ADR-0026)
+
+Ilmari pudottaa aterialuonnokset tiedostoina hakemistoon `/srv/aiops/ravintopolku/luonnokset`, josta työaseman palvelin
+lukee ne ja näyttää Asetusten ILMARIn luonnoslaatikossa. Käyttäjä avaa luonnoksen, tarkistaa ja tallentaa aterian;
+mitään ei kirjata päiväkirjaan automaattisesti. Node-palvelinta tai salasanaa ei tarvita: tunnistus on Tailscale-identiteetti.
+Asennus: lisää `luonnokset = "/srv/aiops/ravintopolku/luonnokset"` tiedostoon `/etc/ravintopolku/palvelin.toml`, luo hakemisto
+`sudo install -d -o aiops-gw -g ravintopolku -m 2770 /srv/aiops/ravintopolku/luonnokset` ja käynnistä palvelu uudelleen
+(`sudo systemctl restart ravintopolku.service`). Kelvottomat tiedostot jäävät alihakemistoon `hylatyt/` syineen.
+Tiedostomuoto ja säännöt: [ILMARI-integraatio](docs/ilmari-integration.md).

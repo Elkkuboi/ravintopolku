@@ -21,6 +21,8 @@ MUUTOKSIA_MAX = 500
 HAKU_MAX = 500
 VARMISTUS_PAIVAT = 30
 VIENTI_VERSIO = "ravintopolku-paivakirja-v1"
+LUONNOKSIA_MAX = 100  # odottavia Ilmari-luonnoksia enintään (kuten Node-palvelimen laatikossa)
+LUONNOS_PAIVAT = 7  # odottava luonnos vanhenee seitsemässä päivässä
 
 SKEEMA = """
 CREATE TABLE IF NOT EXISTS merkinnat (
@@ -33,6 +35,16 @@ CREATE TABLE IF NOT EXISTS merkinnat (
   laite TEXT NOT NULL,
   PRIMARY KEY (taulu, id),
   CHECK ((poistettu = 1 AND data IS NULL) OR (poistettu = 0 AND data IS NOT NULL))
+);
+CREATE TABLE IF NOT EXISTS luonnokset (
+  id INTEGER PRIMARY KEY,
+  external_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  data TEXT,
+  saapunut TEXT NOT NULL,
+  tila TEXT NOT NULL CHECK (tila IN ('pending', 'done')),
+  UNIQUE (source, external_id),
+  CHECK ((tila = 'pending' AND data IS NOT NULL) OR tila = 'done')
 );
 """
 
@@ -185,3 +197,45 @@ def vie(yhteys: sqlite3.Connection, kohde: Path, nyt: datetime | None = None) ->
     finally:
         os.close(fd)
     os.replace(valiaikainen, kohde)
+
+
+def luonnos_lisaa(yhteys: sqlite3.Connection, kuori: dict, nyt: datetime | None = None) -> int | None:
+    """Tallentaa Ilmarin tuloskuoren odottavaksi luonnokseksi (aiops ADR-0026). Sama source + externalId otetaan
+    vastaan vain kerran: toistosta palautetaan None, eikä mitään tallenneta. Korjattu tulos tarvitsee uuden tunnisteen."""
+    aika = (nyt or datetime.now(timezone.utc)).isoformat(timespec="seconds")
+    teksti = json.dumps(kuori, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    kursori = yhteys.execute(
+        "INSERT INTO luonnokset (external_id, source, data, saapunut, tila) VALUES (?, ?, ?, ?, 'pending') "
+        "ON CONFLICT (source, external_id) DO NOTHING", (kuori["externalId"], kuori["source"], teksti, aika))
+    return kursori.lastrowid if kursori.rowcount == 1 else None
+
+
+def luonnos_on_vastaanotettu(yhteys: sqlite3.Connection, source: str, external_id: str) -> bool:
+    return yhteys.execute("SELECT 1 FROM luonnokset WHERE source = ? AND external_id = ?",
+                          (source, external_id)).fetchone() is not None
+
+
+def luonnoksia_odottaa(yhteys: sqlite3.Connection) -> int:
+    return yhteys.execute("SELECT COUNT(*) FROM luonnokset WHERE tila = 'pending'").fetchone()[0]
+
+
+def luonnokset_odottavat(yhteys: sqlite3.Connection) -> list[dict]:
+    """Odottavat luonnokset uusin ensin: id, externalId, source, saapunut ja itse luonnos (ei koko kuorta)."""
+    rivit = yhteys.execute(
+        "SELECT id, external_id, source, saapunut, data FROM luonnokset WHERE tila = 'pending' ORDER BY id DESC").fetchall()
+    return [{"id": i, "externalId": e, "source": s, "saapunut": a, "draft": json.loads(d)["draft"]}
+            for i, e, s, a, d in rivit]
+
+
+def luonnos_valmis(yhteys: sqlite3.Connection, tunniste: int) -> bool:
+    """Merkitsee luonnoksen käsitellyksi ja poistaa sen sisällön; tunniste jää toistojen torjuntaan."""
+    kursori = yhteys.execute("UPDATE luonnokset SET tila = 'done', data = NULL WHERE id = ? AND tila = 'pending'",
+                             (tunniste,))
+    return kursori.rowcount == 1
+
+
+def luonnokset_vanhenna(yhteys: sqlite3.Connection, nyt: datetime | None = None) -> int:
+    """Seitsemän päivää odottaneet luonnokset merkitään käsitellyiksi ja niiden sisältö poistetaan."""
+    raja = ((nyt or datetime.now(timezone.utc)) - timedelta(days=LUONNOS_PAIVAT)).isoformat(timespec="seconds")
+    return yhteys.execute("UPDATE luonnokset SET tila = 'done', data = NULL WHERE tila = 'pending' AND saapunut < ?",
+                          (raja,)).rowcount

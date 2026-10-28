@@ -1,5 +1,5 @@
 import { type AIDraft } from "./ai/provider";
-import { dismissDraft } from "./ai/client";
+import { poistaLuonnos } from "./ai/luonnokset";
 import { connectionChanged } from "./ai/useAIStatus";
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useAutoSync } from "./data/useAutoSync";
@@ -103,11 +103,11 @@ export default function App() {
   };
   const saved = () => {
     if (dialog?.kind === "meal" && dialog.inboxId)
-      void dismissDraft(dialog.inboxId)
+      void poistaLuonnos(dialog.inboxId)
         .then(() => connectionChanged())
         .catch(() =>
           notify(
-            "Ateria tallennettu laitteelle. Luonnos jäi palvelun laatikkoon; merkitse se käsitellyksi myöhemmin.",
+            "Ateria tallennettu laitteelle. Luonnos jäi palvelimen laatikkoon; merkitse se käsitellyksi myöhemmin.",
           ),
         );
     setDialog(null);
@@ -332,8 +332,8 @@ export default function App() {
                   onIntegrationDraft={(item) =>
                     open({
                       kind: "meal",
-                      initialDraft: item.envelope.draft,
-                      inboxId: item.id,
+                      initialDraft: item.draft,
+                      inboxId: String(item.id),
                     })
                   }
                   onFood={(food) => open({ kind: "food", food })}

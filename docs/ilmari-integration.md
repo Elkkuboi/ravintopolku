@@ -61,6 +61,48 @@ npm run ilmari -- schema /tmp/ravintopolku-draft.schema.json
 
 CLI validoi tiedoston ennen HTTP-kutsua, ei lue aiops-kantaa/avaimia eikä käynnistä kontteja. Se tulostaa vain vastaanoton tunnisteen ja tilan. Virheestä ei tulosteta syötettä tai tokenia. Tarkka tiedostopolkujen ja tuloslähteen valinta kuuluu myöhempään aiops-adapteriin.
 
+## Tiedostopudotus palvelimelle (aiops ADR-0026)
+
+Työasemalla (`https://tyoasema.taild1a5b7.ts.net:8443`) Node-palvelinta ei ole, joten yllä kuvattu HTTP-vastaanotto ei ole
+käytössä. Sen sijaan Ilmari (aiops-gatewayn `aiops-gw`-käyttäjänä ajettava palvelu) **pudottaa tuloskuoren tiedostona**
+hakemistoon, jonka Ravintopolun Python-palvelin (`palvelin/`) lukee ja tarjoilee sovelluksen ILMARIn luonnoslaatikkoon.
+Tiedostopudotuksessa ei ole tokenia eikä verkkoa: oikeudet ovat hakemiston käyttöoikeuksia, ja laatikko näkyy vain
+Tailscale-tunnistetulle käyttäjälle samasta alkuperästä. Ilmari ei edelleenkään kirjoita päiväkirjaan: luonnos päätyy
+ateriaksi vasta käyttäjän tarkistuksen ja tallennuksen jälkeen.
+
+**Hakemisto.** Konfiguraation `/etc/ravintopolku/palvelin.toml` valinnainen rivi `luonnokset = "/srv/aiops/ravintopolku/luonnokset"`
+(malli: `config/palvelin.toml.esimerkki`). Ilman riviä palvelin ei lue tiedostoja ja laatikko on tyhjä. Hakemiston omistaa
+`aiops-gw`, ryhmä on `ravintopolku` ja tila `2770` (setgid: palvelimen luomat alihakemistot ja tiedostot perivät ryhmän):
+
+```bash
+sudo install -d -o aiops-gw -g ravintopolku -m 2770 /srv/aiops/ravintopolku/luonnokset
+```
+
+Palvelun sandbox (`BindPaths=/srv/aiops/ravintopolku`) kattaa hakemiston jo; palvelutiedostoa ei tarvitse muuttaa. Ilmarin
+kirjoittamien tiedostojen pitää olla ryhmän luettavissa (esimerkiksi 0640), jotta `ravintopolku`-käyttäjä voi lukea ne.
+
+**Tiedosto.** Nimi `<YYYYMMDD-HHMMSS>-<externalId>.json`, esimerkiksi `20261028-120000-job-42-result-1.json`; `externalId`
+on sama kuin kuoressa (1–128 merkkiä `[a-zA-Z0-9._:-]`). Sisältö on täsmälleen yllä kuvattu tuloskuori (`schemaVersion` 1,
+`source`, `externalId`, `dataClass`, `draft` AIDraft-skeeman mukaisena) UTF-8-JSONina, enintään **64 KiB**. Kirjoita
+atomisesti: ensin pisteellä alkavaan väliaikaisnimeen samassa hakemistossa (esim. `.20261028-120000-job-42-result-1.json.tmp`)
+ja sitten `rename`. Palvelin käsittelee vain nimimallin mukaiset tiedostot; muut nimet se jättää koskematta.
+
+**Käsittely.** Palvelin lukee hakemiston huoltosilmukassa (60 s välein) ja heti, kun sovellus hakee laatikon
+(`GET /api/luonnokset`). Tiedosto avataan seuraamatta symbolisia linkkejä, ja vain tavallinen tiedosto kelpaa. Kuori
+tarkistetaan samoin säännöin kuin HTTP-vastaanotossa; `restricted` hylätään aina. Kelvollinen luonnos tallentuu palvelimen
+SQLite-kantaan odottavaksi (`luonnokset`-taulu) ja tiedosto poistetaan. **Kelvoton tiedosto siirretään alihakemistoon
+`hylatyt/`** ja syy kirjoitetaan viereen tiedostoon `<nimi>.syy.txt`; mitään ei poisteta hiljaa. Sama `source + externalId`
+otetaan vastaan vain kerran: toistotiedosto poistetaan ilman uutta luonnosta myös silloin, kun aiempi on jo käsitelty.
+Korjattu tulos tarvitsee uuden `externalId`:n. Laatikossa on enintään 100 odottavaa luonnosta; ylimenevät tiedostot jäävät
+odottamaan hakemistoon. Odottava luonnos vanhenee seitsemässä päivässä, jolloin se merkitään käsitellyksi ja sen sisältö
+poistetaan kannasta; tunniste säilyy toistojen torjuntaan.
+
+**Rajapinta sovellukselle** (sama Tailscale-tunnistus ja saman alkuperän säännöt kuin muilla `/api`-reiteillä):
+`GET /api/luonnokset` → `{"luonnokset":[{"id","externalId","source","saapunut","draft"}]}` (vain odottavat, uusin ensin);
+`DELETE /api/luonnokset/{id}` merkitsee luonnoksen käsitellyksi (404, jos sitä ei ole odottamassa). Sovellus avaa luonnoksen
+Asetuksista aterialomakkeeseen, ja tallennuksen jälkeen se kuittaa luonnoksen; ateriaan jää oletusrivi `ILMARI-luonnos: <id>`.
+Kuittaus on best effort: yhteysvirhe ei peru jo tallennettua ateriaa, ja luonnoksen voi merkitä käsitellyksi myöhemmin.
+
 ## Live-aiopsiin kytkeminen: jäljellä oleva työ
 
 1. Hanki aiopsin lähdekoodi luettavaksi ja lue sen AGENTS.md, ADR-0003/0007/0010, gatewayn reitit ja job/tulosskeemat. Varmista nykyinen asennettu versio; toimitettu tilannekuva ei korvaa tarkastusta.

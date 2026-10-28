@@ -37,6 +37,14 @@ def test_palvelutiedosto():
 def test_konfiguraatiomalli_kelpaa():
     a = lue(JUURI / "config" / "palvelin.toml.esimerkki")
     assert a.alkupera == "https://tyoasema.tailnet.ts.net:8443" and dict(a.kayttajat) == {"tunnus@github": "elias"}
+    assert a.luonnokset == Path("/srv/aiops/ravintopolku/luonnokset")
+
+
+def test_pudotushakemisto_on_valinnainen():
+    p = {"rp_id": "tyoasema.ts.net", "tietokanta": "/a/p.sqlite", "varmistus": "/a/v", "julkinen": "/a/j.json",
+         "sovellus": "/opt/d", "kayttajat": {"t@github": "elias"}}
+    assert jasenna({"palvelin": p}).luonnokset is None
+    assert jasenna({"palvelin": {**p, "luonnokset": "/srv/l"}}).luonnokset == Path("/srv/l")
 
 
 @pytest.mark.parametrize("muutos", [
@@ -45,6 +53,9 @@ def test_konfiguraatiomalli_kelpaa():
     lambda p: p.update(rp_id="tyoasema.ts.net:8443"),
     lambda p: p.update(tietokanta="suhteellinen/polku"),
     lambda p: p.update(julkinen="/srv/aiops/../etc/x.json"),
+    lambda p: p.update(luonnokset="suhteellinen"),
+    lambda p: p.update(luonnokset=""),
+    lambda p: p.update(luonnokset=None),
     lambda p: p.update(kayttajat={}),
     lambda p: p.update(kayttajat={"a b": "elias"}),
 ])

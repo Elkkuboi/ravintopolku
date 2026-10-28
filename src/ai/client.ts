@@ -4,7 +4,7 @@ import {
   type AIProvider,
   type AITask,
 } from "./provider";
-import { statusSchema, inboxSchema, type APIStatus } from "./contracts";
+import { statusSchema, type APIStatus } from "./contracts";
 export const apiURL = (path: string) =>
   import.meta.env.BASE_URL + "api/" + path;
 export async function apiRequest(path: string, options: RequestInit = {}) {
@@ -57,10 +57,6 @@ export const login = async (password: string) => {
 };
 export const logout = () =>
   apiRequest("logout", { method: "POST", body: "{}" });
-export const getInbox = async () =>
-  inboxSchema.parse(await apiRequest("inbox"));
-export const dismissDraft = (id: string) =>
-  apiRequest("inbox/" + encodeURIComponent(id), { method: "DELETE" });
 async function encodeImage(blob: Blob) {
   if (blob.size > 2 * 1024 * 1024)
     throw new Error("Kuva on liian suuri (2 Mt).");

@@ -1,58 +1,72 @@
+// ILMARIn luonnoslaatikko: työaseman palvelimen /api/luonnokset (aiops ADR-0026), ei Node-palvelimen /api/inbox.
 import { useState, useEffect, useCallback } from "react";
 import { type Dataset } from "../domain/model";
-import { type InboxItem, type APIStatus } from "../ai/contracts";
-import { getInbox, dismissDraft } from "../ai/client";
+import { type Luonnos } from "../ai/contracts";
+import { haeLuonnokset, poistaLuonnos } from "../ai/luonnokset";
 import { connectionChanged } from "../ai/useAIStatus";
 export function IntegrationInbox({
-  status,
   data,
   onOpen,
 }: {
-  status: APIStatus | null;
   data: Dataset;
-  onOpen: (item: InboxItem) => void;
+  onOpen: (item: Luonnos) => void;
 }) {
-  const [items, setItems] = useState<InboxItem[]>([]),
+  const [items, setItems] = useState<Luonnos[]>([]),
+    [available, setAvailable] = useState<boolean | null>(null),
     [error, setError] = useState("");
   const refresh = useCallback(async () => {
-    if (!status?.authenticated || !navigator.onLine) return;
-    try {
-      setItems(await getInbox());
+    if (!navigator.onLine) return;
+    const tulos = await haeLuonnokset();
+    if (tulos.tila === "ok") {
+      setItems(tulos.luonnokset);
+      setAvailable(true);
       setError("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Luonnosten haku epäonnistui.");
+    } else if (tulos.tila === "ei-palvelinta") {
+      setItems([]);
+      setAvailable(false);
+      setError("");
+    } else {
+      setError("Luonnosten haku epäonnistui: " + tulos.viesti);
     }
-  }, [status?.authenticated]);
+  }, []);
   useEffect(() => {
     const timer = setTimeout(() => void refresh(), 0);
     const listener = () => void refresh();
-    window.addEventListener("ravintopolku-ai-changed", listener);
+    for (const name of ["ravintopolku-ai-changed", "online"])
+      window.addEventListener(name, listener);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("ravintopolku-ai-changed", listener);
+      for (const name of ["ravintopolku-ai-changed", "online"])
+        window.removeEventListener(name, listener);
     };
   }, [refresh]);
-  if (!status?.authenticated || !status.integrationEnabled) return null;
   return (
     <>
       <h3>ILMARIn luonnoslaatikko</h3>
       <p className="small muted">
-        Luonnokset säilyvät palvelulla enintään seitsemän päivää. Ne päätyvät
-        päiväkirjaan vasta sinun tarkistuksesi ja tallennuksesi jälkeen.
+        Ilmari jättää aterialuonnokset työaseman palvelimelle, jossa ne
+        säilyvät enintään seitsemän päivää. Ne päätyvät päiväkirjaan vasta
+        sinun tarkistuksesi ja tallennuksesi jälkeen.
       </p>
-      {!items.length && <p className="muted small">Ei odottavia luonnoksia.</p>}
+      {available === false && (
+        <p className="muted small">
+          Luonnoslaatikko on käytettävissä työaseman palvelimen kautta tai
+          kirjautuneena AI-palveluun.
+        </p>
+      )}
+      {available && !items.length && (
+        <p className="muted small">Ei odottavia luonnoksia.</p>
+      )}
       {items.map((item) => {
         const saved = data.meals.some((m) =>
           m.assumptions.includes("ILMARI-luonnos: " + item.id),
         );
         return (
           <div className="card" key={item.id}>
-            <strong>{item.envelope.draft.name}</strong>
+            <strong>{item.draft.name}</strong>
             <p className="small muted">
-              {item.envelope.source} · {item.envelope.externalId} ·{" "}
-              {item.envelope.dataClass === "private"
-                ? "yksityinen"
-                : "julkinen"}
+              {item.source} · {item.externalId} ·{" "}
+              {new Date(item.saapunut).toLocaleString("fi-FI")}
             </p>
             {saved ? (
               <p className="small">
@@ -74,11 +88,11 @@ export function IntegrationInbox({
                 if (
                   !saved &&
                   !window.confirm(
-                    "Poistetaanko tämä luonnos palvelun laatikosta?",
+                    "Poistetaanko tämä luonnos palvelimen laatikosta?",
                   )
                 )
                   return;
-                void dismissDraft(item.id)
+                void poistaLuonnos(item.id)
                   .then(() => connectionChanged())
                   .catch((e) =>
                     setError(
