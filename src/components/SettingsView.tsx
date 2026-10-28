@@ -2,7 +2,7 @@ import { AIConnection } from "./AIConnection";
 import { SyncPanel } from "./SyncPanel";
 import { IntegrationInbox } from "./IntegrationInbox";
 import { useAIStatus } from "../ai/useAIStatus";
-import { type InboxItem } from "../ai/contracts";
+import { type Luonnos } from "../ai/contracts";
 import { useState, useEffect } from "react";
 import {
   Download,
@@ -42,7 +42,7 @@ export function SettingsView({
   onDemo: () => void;
   notify: (s: string) => void;
   run: (f: () => Promise<void>) => Promise<void>;
-  onIntegrationDraft: (item: InboxItem) => void;
+  onIntegrationDraft: (item: Luonnos) => void;
 }) {
   const {
     status: aiStatus,
@@ -327,11 +327,7 @@ export function SettingsView({
       <section className="card">
         <h2>AI-palvelu ja ILMARI</h2>
         <AIConnection status={aiStatus} error={aiError} onRefresh={refreshAI} />
-        <IntegrationInbox
-          status={aiStatus}
-          data={data}
-          onOpen={onIntegrationDraft}
-        />
+        <IntegrationInbox data={data} onOpen={onIntegrationDraft} />
       </section>
       <section className="card">
         <h2>Tutustu kokeilutilassa</h2>
