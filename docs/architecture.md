@@ -50,4 +50,9 @@ ILMARI-token oikeuttaa vain skeeman hakemiseen ja luonnoksen jättämiseen. Se e
 
 PWA:n sovellusbase, manifest, SW-scope, ikonit ja API-reitti ovat yhtenäisesti konfiguroitavissa. Workbox ei palauta sovellus-HTML:ää API-navigaatioon eikä cacheta API-vastauksia. Backend tarjoaa dist-resurssit ja no-cache-otsakkeet indexille/SW:lle. HTTPS-käytössä erillinen origin eristää Ravintopolun aiopsin hyväksyntäreiteistä; alihakemisto yksin ei eristä same-origin-JavaScriptiä.
 
+Työasemalla (`palvelin/`, Python) Node-palvelinta ei ole. Ilmarin luonnokset tulevat tiedostopudotuksena hakemistoon,
+jonka Python-palvelin lukee huoltosilmukassa, tarkistaa samoin säännöin ja tarjoilee reitillä `/api/luonnokset`
+Tailscale-tunnistuksella (aiops ADR-0026). Sovelluksen luonnoslaatikko käyttää tätä reittiä; Node-palvelimen `/api/inbox`
+jää sen omaksi reitiksi.
+
 Katso [AI-integraatio](ai-integration.md) ja [ILMARI-sopimus ja live-työn rajat](ilmari-integration.md). Tuleva aiops-adapteri ei saa ohittaa gatewayta, politiikkaa tai hyväksyntää. Tämän version Node-palvelin on henkilökohtainen valinnainen API-välittäjä, ei yleiskäyttöinen agenttialusta tai usean laitteen synkronointipalvelu.
