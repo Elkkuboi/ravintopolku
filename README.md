@@ -142,6 +142,7 @@ Kotinäkymän **Kuvaa ateria** luo aterian pelkästä kuvasta – ruoka-annokses
 per 100 g ja pakkauksen paino) – eikä vaadi muita kenttiä. Työaseman palvelin lähettää kuvan aiops-välittäjälle
 Unix-soketissa; välittäjän rooli valitaan Asetukset → Kuvantulkinta (Hubin valinta, pilvi tai paikallinen malli) tai
 Ilmari Hubista. Ateria tallentuu heti alkuperällä `Kuvasta (rooli X)` ja mallin oletuksilla; ilmoituksen **Avaa** avaa
-sen muokattavaksi. Asennus: lisää `valittaja = "/run/aiops-valittaja/valittaja.sock"` tiedostoon
-`/etc/ravintopolku/palvelin.toml` ja käynnistä palvelu uudelleen. Sopimus, roolit ja rajat:
+sen muokattavaksi. Asennus: `scripts/asenna-tyoasema.sh` lisää rivin `valittaja = "/run/aiops-valittaja/valittaja.sock"`
+tiedostoon `/etc/ravintopolku/palvelin.toml` itse, kun välittäjän soketti on olemassa (tai lisää se käsin ja käynnistä
+palvelu uudelleen). Sopimus, roolit ja rajat:
 [ILMARI-integraatio](docs/ilmari-integration.md#kuvasta-ateria-aiops-adr-0027).
