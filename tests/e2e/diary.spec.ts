@@ -265,6 +265,9 @@ test("360–430 px ja työpöytä: ei vaakavieritystä tai konsolivirheitä", as
       width > 760
         ? page.locator(".desktop-sidebar nav")
         : page.locator(".bottom-nav");
+    // Päiväkirja-näkymä on poistettu: jäljellä on kolme välilehteä.
+    await expect(navBar.getByRole("button")).toHaveCount(3);
+    await expect(navBar.getByText("Päiväkirja")).toHaveCount(0);
     await navBar.getByRole("button", { name: "Kehitys", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Painon suunta" }),

@@ -14,10 +14,6 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import {
   Leaf,
-  Sun,
-  BookOpen,
-  TrendingUp,
-  Settings,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -78,7 +74,7 @@ const SettingsView = lazy(() =>
   })),
 );
 import { Modal, BlobImage } from "./components/common";
-type Tab = "today" | "diary" | "progress" | "settings";
+import { tabs, type Tab } from "./components/nav";
 type Toast = { text: string; action?: { label: string; run: () => void } };
 type Dialog =
   | { kind: "profile" }
@@ -87,12 +83,6 @@ type Dialog =
   | { kind: "weight" }
   | { kind: "lifestyle" }
   | null;
-const tabs = [
-  { id: "today", label: "Tänään", icon: Sun },
-  { id: "diary", label: "Päiväkirja", icon: BookOpen },
-  { id: "progress", label: "Kehitys", icon: TrendingUp },
-  { id: "settings", label: "Asetukset", icon: Settings },
-] as const;
 export default function App() {
   useAutoSync();
   const real = useLiveQuery(() => readDataset(), []),
@@ -398,17 +388,11 @@ export default function App() {
               <>
                 <div className="page-heading">
                   <div>
-                    <p className="eyebrow">
-                      {tab === "diary"
-                        ? "PÄIVÄ KERRALLAAN"
-                        : "HYVINVOINTIA OMAAN TAHTIIN"}
-                    </p>
+                    <p className="eyebrow">HYVINVOINTIA OMAAN TAHTIIN</p>
                     <h1>
-                      {tab === "diary"
-                        ? "Päiväkirja"
-                        : isToday
-                          ? `Hei${p?.name ? ", " + p.name : ""}.`
-                          : "Oma päiväkirjasi."}
+                      {isToday
+                        ? `Hei${p?.name ? ", " + p.name : ""}.`
+                        : "Oma päiväkirjasi."}
                     </h1>
                     <p className="muted">
                       {isToday
@@ -870,7 +854,7 @@ export default function App() {
             )}
           </Suspense>
         </main>
-        {p && !demo && (tab === "today" || tab === "diary") && (
+        {p && !demo && tab === "today" && (
           <button
             className="floating-add primary"
             hidden={demo}
