@@ -109,6 +109,18 @@ export async function saveProfileGoal(
     },
   );
 }
+/** Korvaa päivän tavoitteen profiilia koskematta. Ilmarin tavoite-ehdotus hyväksytään tästä. */
+export async function saveGoal(goal: Goal, database = db) {
+  const g = goalSchema.parse(goal);
+  await database.transaction("rw", database.goals, async () => {
+    const existing = await database.goals
+      .where("effectiveDate")
+      .equals(g.effectiveDate)
+      .first();
+    if (existing) await database.goals.delete(existing.id);
+    await database.goals.put(g);
+  });
+}
 export const findWeight = (date: string, database = db) =>
   database.weights.where("date").equals(date).first();
 export const removeWeight = (id: string, database = db) =>
