@@ -16,7 +16,10 @@
 #   - Palvelin: vain commitoitu koodi, uv sync --frozen --no-dev, root omistaa koodin, palvelukäyttäjä ravintopolku.
 #     Käynnissä ollut palvelu pysäytetään vaihdon ajaksi ja käynnistetään sen jälkeen; pysäytettyä ei käynnistetä.
 #   - Skripti ei luo käyttäjää, hakemistoja, konfiguraatiota eikä Serve-ohjausta: ne ovat isäntämuutoksia
-#     (aiops-repon muutosloki).
+#     (aiops-repon muutosloki). Yksi poikkeus (31.10.2026): jos aiops-välittäjän soketti on olemassa eikä
+#     /etc/ravintopolku/palvelin.toml vielä kerro sitä, [palvelin]-tauluun lisätään rivi
+#     valittaja = "/run/aiops-valittaja/valittaja.sock" (kuvasta ateria, aiops ADR-0025/-0027). Rivi lisätään vain
+#     kerran, kaikki tai ei mitään (TOML jäsennetään ennen tallennusta); peruminen: poista rivi ja käynnistä palvelu.
 # =====================================================================
 set -euo pipefail
 
@@ -87,6 +90,32 @@ chown -R root:root "$TARGET/palvelin"
 chmod -R u=rwX,go=rX "$TARGET/palvelin"
 (cd / && sudo -u ravintopolku "$TARGET/palvelin/.venv/bin/ravintopolku-palvelin" --help >/dev/null)
 echo "OK: ravintopolku pystyy käynnistämään palvelimen"
+ASETUKSET=/etc/ravintopolku/palvelin.toml
+VALITTAJA=/run/aiops-valittaja/valittaja.sock
+if [ -f "$ASETUKSET" ] && [ -S "$VALITTAJA" ] && ! grep -Eq '^[[:space:]]*valittaja[[:space:]]*=' "$ASETUKSET"; then
+  if python3 - "$ASETUKSET" "$VALITTAJA" <<'PY'
+import os, pathlib, sys, tomllib
+polku, soketti = pathlib.Path(sys.argv[1]), sys.argv[2]
+rivit = polku.read_text(encoding="utf-8").split("\n")
+kohta = next((i for i, r in enumerate(rivit) if r.strip() == "[palvelin]"), None)
+if kohta is None:
+    sys.exit("[palvelin]-taulua ei löydy")
+rivit.insert(kohta + 1, f'valittaja = "{soketti}"')
+uusi = "\n".join(rivit)
+tomllib.loads(uusi)  # kaikki tai ei mitään: kelvoton tulos ei korvaa tiedostoa
+tila = polku.stat()
+tmp = polku.with_name(polku.name + ".uusi")
+tmp.write_text(uusi, encoding="utf-8")
+os.chmod(tmp, tila.st_mode & 0o777)
+os.chown(tmp, tila.st_uid, tila.st_gid)
+tmp.replace(polku)
+PY
+  then
+    echo "OK: $ASETUKSET sai rivin valittaja = \"$VALITTAJA\" (kuvasta ateria välittäjän kautta)"
+  else
+    echo "VAROITUS: valittaja-riviä ei lisätty tiedostoon $ASETUKSET; lisää se käsin [palvelin]-tauluun" >&2
+  fi
+fi
 install -o root -g root -m 0644 "$STAGE/config/systemd/$UNIT" "/etc/systemd/system/$UNIT"
 systemctl daemon-reload
 echo "$COMMIT $(date -Iseconds)" > "$TARGET/DEPLOYED"
