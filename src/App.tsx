@@ -62,6 +62,13 @@ import { FoodForm } from "./components/FoodForm";
 import { MealEditor } from "./components/MealEditor";
 import { WeightForm, LifestyleForm } from "./components/DailyForms";
 import { MakroMittarit } from "./components/MakroMittarit";
+// Recharts ladataan vasta kotinäkymän makrokuvaajien mukana, jotta ensivälitys
+// pysyy pienenä samalla tavalla kuin Kehitys-näkymässä.
+const MakroKuvaajat = lazy(() =>
+  import("./components/MakroKuvaajat").then((m) => ({
+    default: m.MakroKuvaajat,
+  })),
+);
 const Progress = lazy(() =>
   import("./components/Progress").then((m) => ({ default: m.Progress })),
 );
@@ -495,6 +502,15 @@ export default function App() {
                   </section>
                 )}
                 <MakroMittarit totals={totals} goal={goal} />
+                <Suspense
+                  fallback={
+                    <p className="muted" role="status">
+                      Ladataan makrokuvaajia…
+                    </p>
+                  }
+                >
+                  <MakroKuvaajat data={data} end={date} />
+                </Suspense>
                 <div className="dashboard-grid">
                   <section className="card energy-card">
                     <div className="section-heading">

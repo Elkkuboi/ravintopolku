@@ -61,6 +61,15 @@ test("profiili, kirjasto, moniosainen ateria, historia, vakioateria, paino, kuva
   await saveMeal(page);
   await expect(page.locator(".energy-value")).toContainText("400");
   await expect(page.locator(".missing-notice")).toContainText("kuitu");
+  await expect(page.getByRole("heading", { name: "Makrot" })).toBeVisible();
+  await expect(page.locator(".macro-chart")).toHaveCount(4);
+  expect(
+    await page.locator(".macro-chart.energy .recharts-bar-rectangle").count(),
+  ).toBeGreaterThan(0);
+  // Proteiinipäivä on osittainen → saman makron palkki raidoitetaan.
+  await expect(
+    page.locator(".macro-chart.protein .recharts-bar-rectangle path"),
+  ).toHaveAttribute("fill", /^url\(#macro-partial-protein\)$/);
   await page.locator(".meal-actions summary").click();
   await page
     .locator(".action-menu")
