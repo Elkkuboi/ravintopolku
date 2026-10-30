@@ -242,6 +242,41 @@ test("AI:n virhe jättää aterian ja kuvaajat käyttökelpoisiksi", async ({
   await expect(page.locator(".energy-value")).toContainText("400");
 });
 
+test("Kuvaa ateria: kuva ja vapaat lisätiedot lähtevät yhdessä, teksti jää ateriaan", async ({
+  page,
+}) => {
+  await profile(page);
+  const pyynnot: string[] = [];
+  await page.route("**/api/kuva-ateria", async (route) => {
+    pyynnot.push(route.request().postDataBuffer()?.toString("utf8") ?? "");
+    await route.fulfill({
+      json: { draft, kind: "ateria", rooli: "kuva_tulkki_pilvi" },
+    });
+  });
+  await page
+    .locator(".bottom-nav")
+    .getByRole("button", { name: "Tänään", exact: true })
+    .click();
+  const lisatiedot = "leivässä on kaksi viipaletta Oltermanni light -juustoa";
+  await page.locator(".kuva-ateria textarea").fill(lisatiedot);
+  await page
+    .locator(".kuva-ateria input[type=file]")
+    .setInputFiles("public/icon-192.png");
+  await expect.poll(() => pyynnot.length).toBe(1);
+  expect(pyynnot[0]).toContain('name="kuva"; filename="ateria.jpg"'); // sama multisiosa
+  expect(pyynnot[0]).toContain('name="vihje"');
+  expect(pyynnot[0]).toContain(lisatiedot);
+  await page.getByRole("button", { name: "Avaa", exact: true }).click();
+  const modal = page.getByRole("dialog");
+  await expect(
+    modal.locator("li").filter({ hasText: `Lisätiedot: ${lisatiedot}` }),
+  ).toBeVisible();
+  await expect(
+    modal.locator("li").filter({ hasText: "Kuvasta (rooli" }),
+  ).toBeVisible();
+  await expect(page.locator(".kuva-ateria textarea")).toHaveValue("");
+});
+
 test("viivästynyt AI-vastaus ei korvaa odotuksen aikana syötettyä ateriaa ilman vahvistusta", async ({
   page,
 }) => {

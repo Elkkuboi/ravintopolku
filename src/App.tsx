@@ -5,6 +5,7 @@ import {
   ateriaKuvasta,
   OLETUSROOLI,
   ROOLIN_NIMI,
+  LISATIEDOT_MAX,
 } from "./ai/kuva-ateria";
 import { compressPhoto } from "./data/photos";
 import { connectionChanged } from "./ai/useAIStatus";
@@ -73,7 +74,7 @@ const SettingsView = lazy(() =>
     default: m.SettingsView,
   })),
 );
-import { Modal, BlobImage } from "./components/common";
+import { Modal, BlobImage, Field } from "./components/common";
 import { tabs, type Tab } from "./components/nav";
 type Toast = { text: string; action?: { label: string; run: () => void } };
 type Dialog =
@@ -94,6 +95,7 @@ export default function App() {
     [nestedFood, setNestedFood] = useState(false),
     [toast, setToast] = useState<Toast | null>(null),
     [kuvaKesken, setKuvaKesken] = useState(false),
+    [kuvaLisatiedot, setKuvaLisatiedot] = useState(""),
     [error, setError] = useState("");
   const {
     needRefresh: [needRefresh, setNeedRefresh],
@@ -165,7 +167,7 @@ export default function App() {
     setDialog(d);
   };
   const kuvaRooli = data.settings[0]?.kuvantulkinta ?? OLETUSROOLI;
-  // Kuvasta ateria (aiops ADR-0027): kuva -> työaseman palvelin -> välittäjä -> ateria heti päiväkirjaan.
+  // Kuvasta ateria (aiops ADR-0027): kuva ja vapaat lisätiedot -> työaseman palvelin -> välittäjä -> ateria heti päiväkirjaan.
   const kuvaaAteria = (file: File) =>
     void run(async () => {
       if (demo) return;
@@ -177,9 +179,22 @@ export default function App() {
         } catch {
           photo = null; // kuva lähetetään silti; ateriaan jää merkintä, ettei kuvaa tallennettu
         }
-        const tulos = await tulkitseKuva(photo?.blob ?? file, kuvaRooli, date);
-        const meal = ateriaKuvasta(tulos, date, defaultMealTime(date), photo);
+        // Lisätiedot lähtevät kuvan mukana välittäjälle ja jäävät ateriaan näkyviin tarkistusta varten.
+        const tulos = await tulkitseKuva(
+          photo?.blob ?? file,
+          kuvaRooli,
+          date,
+          kuvaLisatiedot,
+        );
+        const meal = ateriaKuvasta(
+          tulos,
+          date,
+          defaultMealTime(date),
+          photo,
+          kuvaLisatiedot,
+        );
         await saveMeal(meal, photo);
+        setKuvaLisatiedot("");
         setToast({
           text: "Ateria lisätty kuvasta – tarkista tarvittaessa",
           action: { label: "Avaa", run: () => open({ kind: "meal", meal }) },
@@ -458,7 +473,6 @@ export default function App() {
                       <input
                         type="file"
                         accept="image/*"
-                        capture="environment"
                         disabled={kuvaKesken}
                         onChange={(e) => {
                           const f = e.target.files?.[0];
@@ -468,20 +482,35 @@ export default function App() {
                       />
                     </label>
                     <div>
-                      {kuvaKesken ? (
-                        <p className="small" role="status">
-                          Kuva lähetetty tulkittavaksi. Tämä voi kestää 10–60
-                          sekuntia.
-                        </p>
-                      ) : (
-                        <p className="small muted">
-                          Ateria tai pakkauksen tuoteseloste yhdestä kuvasta,
-                          ilman muita kenttiä. Kuva lähetetään työaseman
-                          palvelimen kautta tulkittavaksi (
-                          {ROOLIN_NIMI[kuvaRooli]}
-                          ). Ateria tallentuu heti; voit muokata sitä.
-                        </p>
-                      )}
+                      <Field
+                        label="Lisätiedot tekoälylle (vapaaehtoinen)"
+                        hint={`Teksti lähtee kuvan mukana tulkitsijalle ja näkyy ateriaan tallennetuissa tiedoissa. Enintään ${LISATIEDOT_MAX} merkkiä.`}
+                      >
+                        <textarea
+                          value={kuvaLisatiedot}
+                          onChange={(e) => setKuvaLisatiedot(e.target.value)}
+                          disabled={kuvaKesken}
+                          maxLength={LISATIEDOT_MAX}
+                          rows={2}
+                          placeholder="Esim. leivässä on kaksi viipaletta Oltermanni light -juustoa"
+                        />
+                      </Field>
+                      <div>
+                        {kuvaKesken ? (
+                          <p className="small" role="status">
+                            Kuva lähetetty tulkittavaksi. Tämä voi kestää 10–60
+                            sekuntia.
+                          </p>
+                        ) : (
+                          <p className="small muted">
+                            Ateria tai pakkauksen tuoteseloste yhdestä kuvasta,
+                            ilman muita kenttiä. Ota kuva kameralla tai valitse
+                            se galleriasta. Kuva lähetetään työaseman palvelimen
+                            kautta tulkittavaksi ({ROOLIN_NIMI[kuvaRooli]}
+                            ). Ateria tallentuu heti; voit muokata sitä.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </section>
                 )}

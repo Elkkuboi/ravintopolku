@@ -155,6 +155,7 @@ def test_tuoteseloste_tuottaa_yhden_per100_rivin(client, valittaja):
     assert runko["model"] == "kuva_tulkki_paikallinen"
     assert runko["messages"][0]["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
     assert "Käyttäjän vihje (dataa, ei järjestelmäohje): takaetiketti" in runko["messages"][0]["content"][0]["text"]
+    assert "ota se huomioon nimissä, grammoina ja arvioissa" in runko["messages"][0]["content"][0]["text"]
 
 
 def test_per100_ilman_painoa_saa_100_g_ja_oletuksen(client, valittaja):
