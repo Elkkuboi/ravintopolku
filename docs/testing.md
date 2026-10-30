@@ -20,6 +20,7 @@ Vitest testaa:
 - JSON palauttaa aterian, null-arvot ja blob-kuvan.
 - Tuntematon varmuuskopioversio, vioittunut kuva ja päällekkäiset painopäivät eivät muuta tietokantaa.
 - CSV-yksiköt, kattavuus, alkuperä, aikavyöhyke ja tyhjät arvot.
+- Päänavigaatiossa on kolme välilehteä (Tänään, Kehitys, Asetukset); erillistä Päiväkirja-näkymää ei ole, koska "Tänään" näyttää saman sisällön.
 
 Playwrightin mobiili-Chromium testaa:
 
@@ -29,7 +30,7 @@ Playwrightin mobiili-Chromium testaa:
 - AI:n virheellinen JSON ja kelvollisen vastauksen avautuminen hyväksymistä odottavaksi luonnokseksi.
 - Oikean PNG-tiedoston pienennys ja esikatselu, JSON-vienti, palautuksen esikatselu, väärän vahvistuksen estäminen, vahvistettu palautus, näkyvä kuva ja CSV-lataus.
 - Offline-käynnistys, aterian lisäys, reload, offline-muokkaus ja kuvaajan käyttö tuotantoversiolla.
-- Näkymät 360, 393, 430 ja 1440 pikselissä, sivun vaakavierityksen puuttuminen ja selainvirheet. Kuvakaappaukset syntyvät `test-results/`-hakemistoon.
+- Näkymät 360, 393, 430 ja 1440 pikselissä, kolmen välilehden navigaatio (entistä Päiväkirja-välilehteä ei tarjota), sivun vaakavierityksen puuttuminen ja selainvirheet. Kuvakaappaukset syntyvät `test-results/`-hakemistoon.
 
 Lopullinen v1.1-ajo 4.10.2026: `npm run typecheck`, `npm run lint`, `npm test` (33/33), `npm run build` ja `npm run test:e2e` (11/11) onnistuivat. Tuotantokäännös tuottaa manifestin, ikonit, service workerin ja kaikki sovellusresurssit (14 precache-merkintää). Ei buildin chunk-varoituksia. `npm run schema` generoi version 1 AI-skeeman.
 
