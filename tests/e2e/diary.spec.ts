@@ -390,3 +390,40 @@ test("virheellinen kuva näyttää virheen ja käsinkirjaus toimii edelleen", as
   await saveMeal(page);
   await expect(page.locator(".energy-value")).toContainText("200");
 });
+test("päivän paino yhdellä kentällä: vapaa teksti, valinnaisuus ja epäselvä arvo", async ({
+  page,
+}) => {
+  await profile(page);
+  const kenttä = page.locator(".quick-paino input"),
+    tallenna = page
+      .locator(".quick-paino")
+      .getByRole("button", { name: "Tallenna", exact: true });
+  // Paino on valinnainen: näkymä ei täytä kenttää eikä tyhjää tallenneta.
+  await expect(kenttä).toBeEmpty();
+  await expect(tallenna).toBeDisabled();
+  await kenttä.fill("paino 82,4");
+  await expect(tallenna).toBeEnabled();
+  await tallenna.click();
+  await expect(page.locator(".small-stat")).toContainText("82,4");
+  await expect(kenttä).toBeEmpty();
+  // Saman päivän uusi lukema korvaa edellisen: yksi mittaus päivässä.
+  await kenttä.fill("punnitsin itseni aamulla 82,9 kiloa");
+  await tallenna.click();
+  await expect(page.locator(".small-stat")).toContainText("82,9");
+  await page.reload();
+  await nav(page, "Tänään");
+  await expect(page.locator(".small-stat")).toContainText("82,9");
+  // Epäselvää tekstiä ei arvata: virhe kertoo ja vanha arvo jää näkyviin.
+  await kenttä.fill("82,9 ja 90,1");
+  await tallenna.click();
+  await expect(page.locator(".quick-paino").getByRole("alert")).toContainText(
+    "En löydä tekstistä painoa",
+  );
+  await expect(page.locator(".small-stat")).toContainText("82,9");
+  // Kehitys näyttää punnitun päivän.
+  await nav(page, "Kehitys");
+  await expect(
+    page.getByRole("heading", { name: "Painon suunta" }),
+  ).toBeVisible();
+  await expect(page.locator("tbody")).toContainText("82,9");
+});
