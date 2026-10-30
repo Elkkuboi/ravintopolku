@@ -572,6 +572,56 @@ summary:focus-visible {
   box-shadow: inset 0 0 0 2px var(--gold);
 }
 /* ---- /makromittarit ---- */
+/* ---- Makrokuvaajat: kotinäkymän 7 päivän trendit (MakroKuvaajat.tsx) ----
+   Four small bar charts in one card. The hue matches the meter and the dot of
+   the same macro; hatching marks a partial sum and a missing bar is a missing
+   observation, never zero. */
+.macros-card {
+  padding: 20px 24px 18px;
+}
+.macro-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 26px;
+}
+.macro-chart {
+  min-width: 0;
+}
+.macro-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.macro-chart-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.chart.macro-mini {
+  height: 150px;
+}
+.chart-empty.macro-empty {
+  height: 150px;
+  padding: 12px;
+  font-size: 12px;
+}
+.macro-mean {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+.macro-mean strong {
+  color: var(--ink);
+}
+.macro-note {
+  margin: 14px 0 0;
+  line-height: 1.7;
+}
+/* ---- /makrokuvaajat ---- */
 .meals-section > .section-heading {
   margin-top: 30px;
 }
@@ -1476,6 +1526,23 @@ tbody tr:nth-child(even) {
   }
   .meter-numbers {
     margin: 2px 0 6px;
+  }
+  .macros-card {
+    padding: 16px 18px;
+  }
+  .macro-charts {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .chart.macro-mini {
+    height: 135px;
+  }
+  .chart-empty.macro-empty {
+    height: 135px;
+  }
+  .macro-mean,
+  .macro-note {
+    font-size: 11px;
   }
   .nutrients-card {
     padding: 19px 22px;

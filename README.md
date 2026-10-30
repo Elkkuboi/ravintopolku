@@ -74,6 +74,7 @@ Alihakemistotuki on toteutettu: esimerkiksi `VITE_APP_BASE=/ravintopolku/` kää
 - Kuvan liittäminen, muokkaus, kopiointi, siirto, poisto ja vakioateriat määrineen. JPG/PNG/WebP: alkuperäinen enintään 15 Mt, pienennetty JPEG enintään 1600 px / 2 Mt. Kuva säilyy IndexedDB:ssä.
 - Yksi muokattava painomittaus päivässä, vapaaehtoiset elintavat ja käyttäjän merkintä päivän valmistumisesta. Ateriamuutos palauttaa päivän keskeneräiseksi.
 - Kuvaajat 7/30/90 päivälle: painopisteet, 7 kalenteripäivän keskiarvo vähintään kolmella mittauksella, tavoitesuora, energia, proteiini ja ravintoainetaulukko. Puuttuva päivä ei muutu nollaksi; nimittäjä näkyy.
+- Etusivun makrokuvaajat: energia, proteiini, hiilihydraatit ja rasva seitsemänä päivänä valitusta päivästä taaksepäin. Tyhjä kohta on puuttuva havainto eikä nolla, raidoitettu palkki on osittainen summa ja jää keskiarvon ulkopuolelle; katkoviiva on valitun päivän ravintoainetavoite. Päivän makromittarit jäävät niiden yläpuolelle.
 - Täydellinen JSON-varmuuskopio kuvineen ja transaktionaalinen palautus esikatselulla sekä KORVAA-vahvistuksella. CSV-viennit ateriariveistä, painoista ja päivistä. Varmuuskopion tuontiraja 100 Mt. Varmuuskopio sisältää yksityiset tiedot selväkielisinä.
 - Vaalea/tumma tila, kokeilutila ja offline-kirjaus aiemman onnistuneen latauksen jälkeen. Päivitystä ei pakoteta avoimen lomakkeen yli.
 - OpenAI API: pakkauksen tulkinta, annoksen tulkinta ja ateriaehdotus. Käsin käytettävä **Kopioi ohje tekoälylle** ja validoitu JSON-tuonti säilyvät vaihtoehtoina.
