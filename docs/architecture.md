@@ -2,7 +2,7 @@
 
 ## Moduulit ja datan kulku
 
-`src/domain/model.ts` sisältää Zod-skeemat, yksiköt ja tyypit. `nutrition.ts` on ravintoaineiden ainoa laskentapaikka: per100-arvo × grammat / 100 tai annoksen ilmoitettu kokonaisarvo. Pakkauksen energiaa ei korvata makrolaskennalla. `dates.ts` vastaa Helsingin päivistä ja seinäkellon ajasta. `analytics.ts` käyttää raakakirjauksia. `src/data` toteuttaa Dexie-varaston, kuvat, viennit ja eristetyn demodatan. `src/ai` ei tunne tietokantaa eikä voi kirjoittaa sinne. `src/components` ja App ovat käyttöliittymä.
+`src/domain/model.ts` sisältää Zod-skeemat, yksiköt ja tyypit. `nutrition.ts` on ravintoaineiden ainoa laskentapaikka: per100-arvo × grammat / 100 tai annoksen ilmoitettu kokonaisarvo. Pakkauksen energiaa ei korvata makrolaskennalla. `dates.ts` vastaa Helsingin päivistä ja seinäkellon ajasta. `analytics.ts` käyttää raakakirjauksia. `paino.ts` on ainoa paikka, jossa vapaasta tekstistä poimitaan päivän paino ("paino 82,4"); epäselvää ei arvata, ja skeema pyöristää luvun yhteen desimaaliin. `src/data` toteuttaa Dexie-varaston, kuvat, viennit ja eristetyn demodatan. `src/ai` ei tunne tietokantaa eikä voi kirjoittaa sinne. `src/components` ja App ovat käyttöliittymä.
 
 UI validoi syötteen, muodostaa aterian ruokalistasta ja välittää sen `saveMeal`-funktiolle. Tietovarasto validoi uudelleen, laskee snapshotin ja ajankohdan sekä kirjoittaa aterian ja kuvan samassa transaktiossa. Dexien `useLiveQuery` päivittää näkymät kirjoituksen jälkeen. Myöhempi backend voi korvata tietovaraston rajat; puhtaat laskenta- ja analyysifunktiot sekä provider-sopimus säilyvät.
 
@@ -60,5 +60,12 @@ Kuvasta ateria (aiops ADR-0027): `src/ai/kuva-ateria.ts` lähettää kuvan reiti
 AIDraft-luonnokseksi ja tarkistaa sen `luonnokset.tarkista_luonnos`-säännöillä. Sovellus luo aterian heti IndexedDB:hen
 samalla `saveMeal`-polulla kuin lomake; snapshot lasketaan `nutrition.ts`:ssä. Tämä on ainoa toiminto, jossa AI:n luonnos
 tallentuu ilman lomakkeen tarkistusta; alkuperä ja oletukset jäävät ateriaan näkyviin.
+
+Tavoitteet sanoin: `src/ai/tavoitteet.ts` lähettää vapaan tekstin reitille `/api/tavoitteet`, ja Python-palvelimen
+`tavoitteet.py` kutsuu samaa välittäjää (`kuva.kutsu`) roolilla `tavoite_ehdottaja*` ja muuntaa mallin JSONin
+tavoitearvoiksi. Toisin kuin kuvassa, mitään ei tallenneta automaattisesti: Asetukset näyttää numerot muokattavina, ja
+hyväksytty arvo kirjoittuu `saveGoal`-funktiolla tämän päivän tavoitteeksi. Samat äärirajat (energia 800–6000 kcal,
+proteiini 30–250 g, hiilihydraatit 20–700 g, rasva 20–200 g) ja makrojen 10 %:n suhtatarkistus toistuvat molemmilla
+puolilla, joten mallinnumerot eivät koskaan mene sellaisenaan päiväkirjaan.
 
 Katso [AI-integraatio](ai-integration.md) ja [ILMARI-sopimus ja live-työn rajat](ilmari-integration.md). Tuleva aiops-adapteri ei saa ohittaa gatewayta, politiikkaa tai hyväksyntää. Tämän version Node-palvelin on henkilökohtainen valinnainen API-välittäjä, ei yleiskäyttöinen agenttialusta tai usean laitteen synkronointipalvelu.

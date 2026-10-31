@@ -152,6 +152,45 @@ kenttä tai kuva, 404 toiminto ei käytössä, 413 liian suuri, 415 väärä sis
 `settings`-tauluun (`kuvantulkinta`, puuttuva = `kuva_tulkki`) ja synkronoituu laitteiden välillä; sama vaihto on
 Ilmari Hubissa. Node-palvelimella (`server/`) reittiä ei ole.
 
+## Tavoitteet luonnollisesta kielestä
+
+Asetuksissa on **Tavoitteet omin sanoin** -kortti: vapaa tekstikenttä (esim. "painon lievä pudotus" tai "rasvan
+muuttaminen lihakseksi") ja muutaman valmiin kuvauksen painikkeet, joita saa muokata. Sovellus lähettää tekstin sekä
+lyhyen kuvan nykytilanteesta (ikä, pituus, uusin paino, treenit, nykyinen energiatavoite) työaseman palvelimelle, joka
+kutsuu aiops-välittäjää samalla tavalla kuin kuvasta ateria. Ilmari ehdottaa päivän energia- ja makrotavoitteet sekä
+lyhyen perustelun, ja ehdotus näkyy **tarkistettavana**: luvut voi muokata, ja vasta **Hyväksy ja tallenna** kirjoittaa
+tavoitteen. Hylättyä tai epäonnistunutta ehdotusta ei tallenneta, eikä olemassa olevaa tavoitetta muuteta.
+
+**Rajapinta sovellukselle.** `POST /api/tavoitteet` (`palvelin/`, `tavoitteet.py`) JSON-rungolla `{"teksti": enintään
+500 merkkiä, "rooli"?: rooli, "profiili"?: enintään 300 merkkiä}`; sama Tailscale-tunnistus, Origin-sääntö ja 1 MiB:n
+runkoraja kuin muilla `/api`-reiteillä. Vastaus `{"ehdotus": {"energy","protein","carbs","fat"} luku|null,
+"perustelu": enintään 400 merkkiä, "oletukset": [enintään 10 × 300 merkkiä], "rooli", "malli"}`. Ilman
+`valittaja`-sokettia reitti vastaa 404 ja sovellus kertoo, ettei toiminto ole käytössä. Node-palvelimella (`server/`)
+reittiä ei ole.
+
+**Välittäjäkutsu.** `POST /v1/chat/completions` OpenAI-muotoisena JSONina: `model` on **rooli**, ei malli –
+`tavoite_ehdottaja` (Hubin valinta), `tavoite_ehdottaja_pilvi` (pakota pilvimalli) tai `tavoite_ehdottaja_paikallinen`
+(pakota paikallinen malli). Nämä roolit on kytkettävä malleihin Ilmari Hubissa, muuten reitti vastaa 404 "Roolille … ei
+ole mallia". Yksi `user`-viesti (suomenkielinen kehote, jossa tavoite ja nykytilanne **datana, ei järjestelmäohjeina**),
+`response_format: {"type":"json_object"}`, aikaraja 120 s ja sama enintään kahden samanaikaisen kutsun lukko kuin
+kuvassa. Roolia ei valita Asetuksista, joten käytetään aina Hubin valintaa; rooliperhe on varattu tulevaa valitsinta
+varten. Virheet 402/404/501/502/503 näytetään käyttäjälle suomeksi, ja lokiin kirjataan rooli, tila ja kesto — ei
+tavoitetta eikä lukuja.
+
+**Numerot tarkistetaan koodissa** (palvelin `tavoitteet.py` ja selain `src/ai/tavoitteet.ts`, samat rajat): energia
+800–6 000 kcal, proteiini 30–250 g, hiilihydraatit 20–700 g ja rasva 20–200 g. Äärirajan alapuolelle jäävä arvo
+jätetään tyhjäksi ja ylikäynyt leikataan; syy kerrotaan ehdotuksen oletuksissa. Energian puuttuessa se lasketaan
+makroista (4 + 4 + 9 kcal/g), ja jos makrot poikkeavat energiatavoitteesta yli 10 %, näytetään varoitus. Jos yksikään
+neljästä luvusta ei kelpaa, vastaus on 422. Tuntematon arvo on null, ei 0.
+
+**Hyväksyminen.** Hyväksytyt luvut tallentuvat tavoitteeksi, jonka `effectiveDate` on tämä päivä: saman päivän
+tavoite korvataan ja aiempi jää historiaksi. Kuitu sekä painotavoite ja -päivämäärä peritään voimassa olevalta
+tavoitteelta, joten Goal-skeemaa ei muuteta; rooli, malli ja perustelu näkyvät vain tarkistusnäkymässä.
+
+**Testit.** `palvelin/tests/test_tavoitteet.py` (reitti, roolit, numeroiden rajat, virheet ja lokitus väärennetyllä
+välittäjällä Unix-soketissa) ja `tests/tavoitteet.test.ts` (pyyntö, palvelinvirheiden näyttäminen, rajatarkistus ja
+hyväksytyn ehdotuksen tallentuminen Dexielle).
+
 ## Live-aiopsiin kytkeminen: jäljellä oleva työ
 
 1. Hanki aiopsin lähdekoodi luettavaksi ja lue sen AGENTS.md, ADR-0003/0007/0010, gatewayn reitit ja job/tulosskeemat. Varmista nykyinen asennettu versio; toimitettu tilannekuva ei korvaa tarkastusta.

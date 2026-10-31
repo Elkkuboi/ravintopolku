@@ -72,7 +72,7 @@ Alihakemistotuki on toteutettu: esimerkiksi `VITE_APP_BASE=/ravintopolku/` kää
 - Profiili, vapaaehtoiset käyttäjän ravintoainetavoitteet ja voimaantulopäivillä säilyvä tavoitehistoria.
 - Omat ruuat per 100 g -arvoilla, suosikit, moniosaiset ateriat grammoineen ja vaihtoehtoinen annoksen kokonaisarvojen syöttö. Puuttuva arvo on null; tunnettu nolla säilyy nollana. Snapshot suojaa aiempia aterioita ruokakirjaston muutoksilta.
 - Kuvan liittäminen, muokkaus, kopiointi, siirto, poisto ja vakioateriat määrineen. JPG/PNG/WebP: alkuperäinen enintään 15 Mt, pienennetty JPEG enintään 1600 px / 2 Mt. Kuva säilyy IndexedDB:ssä.
-- Yksi muokattava painomittaus päivässä, vapaaehtoiset elintavat ja käyttäjän merkintä päivän valmistumisesta. Ateriamuutos palauttaa päivän keskeneräiseksi.
+- Päivän paino on valinnainen kirjaus: yksi kenttä päivän sivulla ottaa vastaan numerot tai luonnollisen kielen ("paino 82,4"), eikä painoa kysytä pakolla. Yksi muokattava mittaus päivässä, vapaaehtoiset elintavat ja käyttäjän merkintä päivän valmistumisesta. Ateriamuutos palauttaa päivän keskeneräiseksi.
 - Kuvaajat 7/30/90 päivälle: painopisteet, 7 kalenteripäivän keskiarvo vähintään kolmella mittauksella, tavoitesuora, energia, proteiini ja ravintoainetaulukko. Puuttuva päivä ei muutu nollaksi; nimittäjä näkyy.
 - Etusivun makrokuvaajat: energia, proteiini, hiilihydraatit ja rasva seitsemänä päivänä valitusta päivästä taaksepäin. Tyhjä kohta on puuttuva havainto eikä nolla, raidoitettu palkki on osittainen summa ja jää keskiarvon ulkopuolelle; katkoviiva on valitun päivän ravintoainetavoite. Päivän makromittarit jäävät niiden yläpuolelle.
 - Täydellinen JSON-varmuuskopio kuvineen ja transaktionaalinen palautus esikatselulla sekä KORVAA-vahvistuksella. CSV-viennit ateriariveistä, painoista ja päivistä. Varmuuskopion tuontiraja 100 Mt. Varmuuskopio sisältää yksityiset tiedot selväkielisinä.
@@ -142,8 +142,20 @@ Kotinäkymän **Kuvaa ateria** luo aterian pelkästä kuvasta – ruoka-annokses
 per 100 g ja pakkauksen paino) – eikä vaadi muita kenttiä. Kuvan voi ottaa kameralla tai valita galleriasta, ja kuvan
 mukana saa kirjoittaa vapaat lisätiedot (esim. "leivässä on kaksi viipaletta Oltermanni light -juustoa"): ne lähtevät
 välittäjälle tekoälylle datana ja jäävät ateriaan näkyviin, joten Eliakselle ei tule listattavia kenttiä. Työaseman
-palvelin lähettää kuvan aiops-välittäjälle Unix-soketissa; välittäjän rooli valitaan Asetukset → Kuvantulkinta (Hubin
-valinta, pilvi tai paikallinen malli) tai Ilmari Hubista. Ateria tallentuu heti alkuperällä `Kuvasta (rooli X)` ja
-mallin oletuksilla; ilmoituksen **Avaa** avaa sen muokattavaksi. Asennus: lisää
-`valittaja = "/run/aiops-valittaja/valittaja.sock"` tiedostoon `/etc/ravintopolku/palvelin.toml` ja käynnistä palvelu
-uudelleen. Sopimus, roolit ja rajat: [ILMARI-integraatio](docs/ilmari-integration.md#kuvasta-ateria-aiops-adr-0027).
+palvelin lähettää kuvan aiops-välittäjälle
+Unix-soketissa; välittäjän rooli valitaan Asetukset → Kuvantulkinta (Hubin valinta, pilvi tai paikallinen malli) tai
+Ilmari Hubista. Ateria tallentuu heti alkuperällä `Kuvasta (rooli X)` ja mallin oletuksilla; ilmoituksen **Avaa** avaa
+sen muokattavaksi. Asennus: `scripts/asenna-tyoasema.sh` lisää rivin `valittaja = "/run/aiops-valittaja/valittaja.sock"`
+tiedostoon `/etc/ravintopolku/palvelin.toml` itse, kun välittäjän soketti on olemassa (tai lisää se käsin ja käynnistä
+palvelu uudelleen). Sopimus, roolit ja rajat:
+[ILMARI-integraatio](docs/ilmari-integration.md#kuvasta-ateria-aiops-adr-0027).
+
+## Tavoitteet sanoin
+
+Asetusten **Tavoitteet omin sanoin** -kortissa kirjoittaa tavoitteensa vapaina sanoin ("painon lievä pudotus", "rasvan
+muuttaminen lihakseksi") tai valitsee valmiin kuvauksen. Sovellus lähettää tekstin työaseman palvelimelle, joka kutsuu
+aiops-välittäjää samalla soketilla ja rooliperinteellä (`tavoite_ehdottaja`) kuin kuvan; Ilmari ehdottaa päivän
+energia- ja makrotavoitteet sekä lyhyen perustelun. Ehdotus näkyy tarkistettavana ja korjattavana, ja vasta **Hyväksy ja
+tallenna** kirjoittaa päivän tavoitteen — hylätty tai epäonnistunut ehdotus ei muuta mitään. Numerot tarkistetaan
+äärirajojen ja makrojen suhteen sekä palvelimella että selaimessa. Roolit ja rajat:
+[ILMARI-integraatio](docs/ilmari-integration.md#tavoitteet-luonnollisesta-kielestä).

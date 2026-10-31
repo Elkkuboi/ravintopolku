@@ -5,9 +5,15 @@ import {
   stamped,
   numberInput,
 } from "../domain/model";
+import { tulkitsePaino } from "../domain/paino";
+import { formatNumber } from "../domain/nutrition";
 import { saveRecord, findWeight, removeWeight } from "../data/db";
 import { Field, Decimal, Form } from "./common";
 import { useFormAction } from "./useFormAction";
+// Sekä päivän pikakirjaus että tarkistusnäkymä käyttävät samaa tulkintaa:
+// "paino 82,4" ja "82,4" ovat sama tieto.
+const PAINO_VIRHE =
+  'En löydä tekstistä painoa. Kirjoita luku, esimerkiksi "paino 82,4".';
 export function WeightForm({
   date,
   weight,
@@ -19,7 +25,7 @@ export function WeightForm({
 }) {
   const [activeWeight, setActiveWeight] = useState(weight);
   const [day, setDay] = useState(weight?.date ?? date),
-    [kg, setKg] = useState(String(weight?.kg ?? "")),
+    [kgText, setKgText] = useState(String(weight?.kg ?? "")),
     [note, setNote] = useState(weight?.note ?? "");
   const { error, busy, execute } = useFormAction();
   return (
@@ -30,6 +36,8 @@ export function WeightForm({
       onSubmit={(e) => {
         e.preventDefault();
         void execute(async () => {
+          const kg = tulkitsePaino(kgText);
+          if (kg === null) throw new Error(PAINO_VIRHE);
           const existing = await findWeight(day);
           if (existing && existing.id !== activeWeight?.id) {
             if (
@@ -38,7 +46,7 @@ export function WeightForm({
               )
             ) {
               setActiveWeight(existing);
-              setKg(String(existing.kg));
+              setKgText(String(existing.kg));
               setNote(existing.note);
             }
             return;
@@ -46,7 +54,7 @@ export function WeightForm({
           await saveRecord("weights", {
             ...stamped(existing ?? activeWeight),
             date: day,
-            kg: numberInput(kg)!,
+            kg,
             note,
           });
           onSaved();
@@ -61,12 +69,16 @@ export function WeightForm({
           onChange={(e) => setDay(e.target.value)}
         />
       </Field>
-      <Field label="Paino (kg)">
-        <Decimal
-          value={kg}
-          onChange={setKg}
+      <Field
+        label="Paino (kg)"
+        hint='Voit kirjoittaa numeroin tai sanoin, esimerkiksi "paino 82,4".'
+      >
+        <input
+          value={kgText}
+          onChange={(e) => setKgText(e.target.value)}
           required
-          placeholder="Esim. 75,4"
+          placeholder="Esim. 82,4"
+          autoComplete="off"
         />
       </Field>
       <Field label="Muistiinpano (vapaaehtoinen)">
@@ -77,7 +89,8 @@ export function WeightForm({
         />
       </Field>
       <p className="muted small">
-        Yksi mittaus päivässä. Voit muokata sitä myöhemmin.
+        Yksi mittaus päivässä. Paino on aina vapaaehtoinen ja voit muokata sitä
+        myöhemmin.
       </p>
       {weight && (
         <button
@@ -96,6 +109,72 @@ export function WeightForm({
         </button>
       )}
     </Form>
+  );
+}
+// Päivän sivun pikakirjaus: yksi kenttä, vapaa teksti ja Enter. Tyhjää ei
+// tallenneta, joten painoa ei kysytä pakolla. Saman päivän uusi arvo korvaa
+// vanhan, kuten tarkistusnäkymässä.
+export function PainonKirjaus({
+  date,
+  weight,
+  demo = false,
+  onSaved,
+}: {
+  date: string;
+  weight?: Weight;
+  demo?: boolean;
+  onSaved: (viesti: string) => void;
+}) {
+  const [text, setText] = useState(""),
+    { error, busy, execute, setError } = useFormAction();
+  return (
+    <form
+      className="quick-paino"
+      hidden={demo}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void execute(async () => {
+          const kg = tulkitsePaino(text);
+          if (kg === null) {
+            setError(PAINO_VIRHE);
+            return;
+          }
+          const existing = await findWeight(date);
+          await saveRecord("weights", {
+            ...stamped(existing ?? weight),
+            date,
+            kg,
+            note: existing?.note ?? weight?.note ?? "",
+          });
+          setText("");
+          onSaved(`Päivän paino ${formatNumber(kg)} kg kirjattu.`);
+        });
+      }}
+    >
+      <Field label="Paino" hint='Valinnainen, esimerkiksi "paino 82,4".'>
+        <input
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setError("");
+          }}
+          placeholder="paino 82,4"
+          autoComplete="off"
+        />
+      </Field>
+      <button
+        className="secondary"
+        type="submit"
+        disabled={busy || !text.trim()}
+      >
+        Tallenna
+      </button>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 export function LifestyleForm({

@@ -5,7 +5,8 @@ Palvelin kuuntelee vain Unix-soketissa, johon Tailscale Serve ohjaa portin 8443.
 POST ja DELETE hyväksytään vain omasta alkuperästä. Rajapinnassa ei ole verkkoa eikä salaisuuksia. Ilmarin
 aterialuonnokset luetaan pudotushakemistosta (aiops ADR-0026) ja tarjoillaan laatikkoon /api/luonnokset. Kuvasta
 ateria (/api/kuva-ateria) kutsuu aiops-välittäjää Unix-soketissa (aiops ADR-0025/-0027); ilman konfiguroitua
-sokettia reitti vastaa 404.
+sokettia reitti vastaa 404. Tavoite-ehdotus (/api/tavoitteet) kutsuu välittäjää samoin tavoin: vapaasta tekstistä
+päivän tavoitearvot, jotka käyttäjä hyväksyy selaimessa (tavoitteet.py).
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import kanta, kuva, luonnokset
+from . import kanta, kuva, luonnokset, tavoitteet
 from .config import PORTTI, Asetukset
 
 PYYNTO_MAX = 1024 * 1024
@@ -194,6 +195,29 @@ def luo(a: Asetukset) -> Starlette:
             return JSONResponse({"virhe": str(e)}, status_code=e.tila)
         return JSONResponse({**tulos, "pvm": pvm})
 
+    async def api_tavoitteet(request: Request) -> Response:
+        """Tavoite-ehdotus vapaasta tekstistä (tavoitteet.py). Mitään ei kirjoiteta kantaan: selaimessa hyväksytään."""
+        if a.valittaja is None:
+            return JSONResponse({"virhe": "tavoite-ehdotus ei ole käytössä tällä palvelimella"}, status_code=404)
+        runko = b""
+        async for pala in request.stream():
+            runko += pala
+            if len(runko) > PYYNTO_MAX:
+                return JSONResponse({"virhe": "pyyntö on yli 1 MiB"}, status_code=413)
+        try:
+            try:
+                data = json.loads(runko)
+            except ValueError:
+                raise kuva.Virhe(400, "runko ei ole JSONia") from None
+            if not isinstance(data, dict):
+                raise kuva.Virhe(400, "runko: JSON-olio")
+            teksti, rooli, profiili = tavoitteet.tarkista_pyynto(data)
+            async with kuvalukko:  # sama lukko: yksi ihminen ei hapoista useampaa mallia kerrallaan
+                tulos = await run_in_threadpool(tavoitteet.ehdota, str(a.valittaja), teksti, rooli, profiili)
+        except kuva.Virhe as e:
+            return JSONResponse({"virhe": str(e)}, status_code=e.tila)
+        return JSONResponse(tulos)
+
     async def api_tuntematon(request: Request) -> Response:
         return JSONResponse({"virhe": "ei rajapintaa"}, status_code=404)
 
@@ -216,6 +240,7 @@ def luo(a: Asetukset) -> Starlette:
         Route("/api/luonnokset", api_luonnokset, methods=["GET"]),
         Route("/api/luonnokset/{id:int}", api_luonnos_valmis, methods=["DELETE"]),
         Route("/api/kuva-ateria", api_kuva_ateria, methods=["POST"]),
+        Route("/api/tavoitteet", api_tavoitteet, methods=["POST"]),
         Route("/api/{polku:path}", api_tuntematon, methods=["GET", "POST", "DELETE"]),
         Mount("/", app=StaticFiles(directory=str(a.sovellus), html=True, check_dir=False)),
     ], middleware=[Middleware(BaseHTTPMiddleware, dispatch=vartija)], lifespan=elinkaari)

@@ -57,7 +57,11 @@ import { demoDataset } from "./data/demo";
 import { ProfileForm } from "./components/ProfileForm";
 import { FoodForm } from "./components/FoodForm";
 import { MealEditor } from "./components/MealEditor";
-import { WeightForm, LifestyleForm } from "./components/DailyForms";
+import {
+  WeightForm,
+  LifestyleForm,
+  PainonKirjaus,
+} from "./components/DailyForms";
 import { MakroMittarit } from "./components/MakroMittarit";
 // Recharts ladataan vasta kotinäkymän makrokuvaajien mukana, jotta ensivälitys
 // pysyy pienenä samalla tavalla kuin Kehitys-näkymässä.
@@ -811,8 +815,15 @@ export default function App() {
                     <div className="small-stat">
                       {formatNumber(weight?.kg ?? null)} <span>kg</span>
                     </div>
+                    <PainonKirjaus
+                      date={date}
+                      weight={weight}
+                      demo={demo}
+                      onSaved={notify}
+                    />
                     <p className="small muted">
-                      {weight?.note || "Yksi mittaus päivässä riittää."}
+                      {weight?.note ||
+                        "Vain halutessasi: painoa ei kysytä pakolla, yksi mittaus päivässä riittää."}
                     </p>
                   </section>
                   <section className="card">

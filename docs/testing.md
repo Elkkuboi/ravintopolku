@@ -15,6 +15,9 @@ Vitest testaa:
 - Helsingin UTC-vuorokauden rajat, kesä-/talviaika, siirtymät ja olematon kellonaika.
 - 7 **kalenteripäivän** painokeskiarvo, vähintään 3 mittausta ja oikea nimittäjä.
 - Puuttuvat päivät jäävät havainnoista pois eivätkä muutu nolliksi.
+- Päivän painon tulkinta vapaasta tekstistä: "paino 82,4", "82.4" ja päivämäärän kanssa; tulos on aina yhden desimaalin tarkkuudella.
+- Epäselvästä tekstistä (kaksi lukemaa, ei lukemaa, epäkelpo alue) ei arvata, ja painoton päivä tallentuu silti valmiiksi.
+- Paino synkronoituu kuten muut kirjaukset: paikallinen muutos lähtee palvelimelle, ja palvelimen saman päivän mittaus korvaa paikallisen.
 - Virheellinen AI-JSON ja Disabled-/MockProviderin käyttäytyminen.
 - Ruokakirjaston muutos ei muuta aiemman aterian snapshotia.
 - JSON palauttaa aterian, null-arvot ja blob-kuvan.
@@ -28,6 +31,7 @@ Playwrightin mobiili-Chromium testaa:
 - Profiilin luonti ilman ravintoainetavoitteita, suosikkiruuan luonti, moniosainen ateria, annoslaskenta ja aterian muokkaus.
 - Ruokakirjaston muokkaus ja historian muuttumattomuus, vakioaterian tallennus ja käyttö.
 - Painokirjaus desimaalipilkulla, päivän valmius, kuvaajat ja reloadin jälkeinen säilyminen.
+- Päivän painon pikakirjaus luonnollisella kielellä ("paino 82,4"): tyhjää ei tallenneta, ja epäselvä teksti näyttää virheen ilman että vanha arvo muuttuu.
 - AI:n virheellinen JSON ja kelvollisen vastauksen avautuminen hyväksymistä odottavaksi luonnokseksi.
 - Oikean PNG-tiedoston pienennys ja esikatselu, JSON-vienti, palautuksen esikatselu, väärän vahvistuksen estäminen, vahvistettu palautus, näkyvä kuva ja CSV-lataus.
 - Offline-käynnistys, aterian lisäys, reload, offline-muokkaus ja kuvaajan käyttö tuotantoversiolla.
