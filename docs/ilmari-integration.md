@@ -106,9 +106,10 @@ Kuittaus on best effort: yhteysvirhe ei peru jo tallennettua ateriaa, ja luonnok
 ## Kuvasta ateria (aiops ADR-0027)
 
 Ateria syntyy **pelkästä kuvasta** ilman pakollisia kenttiä: kotinäkymän **Kuvaa ateria** -painike avaa kameran (tai
-kuvan valinnan), lähettää kuvan työaseman palvelimelle ja tallentaa palautetun luonnoksen heti valitun päivän ateriaksi.
-Kuva voi olla ruoka-annos tai pakkauksen takaetiketti (ravintosisältö per 100 g ja pakkauksen paino). Ateriaan jää
-alkuperä `Kuvasta (rooli X)` ja mallin oletukset, puuttuvat tiedot ja kysymykset; ilmoituksen **Avaa** avaa aterian
+kuvan valinnan), lähettää kuvan valitulle lähteelle — paikallinen Ilmari tai palvelimen API-avain — ja tallentaa
+palautetun luonnoksen heti valitun päivän ateriaksi. Kuva voi olla ruoka-annos tai pakkauksen takaetiketti
+(ravintosisältö per 100 g ja pakkauksen paino). Ateriaan jää alkuperä `Kuvasta (rooli X)` tai
+`Kuvasta (API-avain: malli)` ja mallin oletukset, puuttuvat tiedot ja kysymykset; ilmoituksen **Avaa** avaa aterian
 muokattavaksi. Pienennetty kuva tallentuu laitteelle kuten muissakin aterioissa (ei synkronoidu).
 
 **Reitti.** Palvelin (`palvelin/`, ADR-0025) kutsuu aiops-välittäjää ("valittaja") Unix-soketissa, joka konfiguroidaan
@@ -145,9 +146,20 @@ Origin-sääntö kuin muilla `/api`-reiteillä): kenttä `kuva` (JPEG/PNG/WebP t
 kenttä tai kuva, 404 toiminto ei käytössä, 413 liian suuri, 415 väärä sisältötyyppi, 422 kuvasta ei saatu ateriaa,
 402/502/503/504 välittäjästä. Lokiin kirjataan rooli, tila ja kesto – ei kuvaa eikä mallin tekstiä.
 
+**Lähteen valinta.** Asetukset → Kuvatunnistuksen lähde: **Paikallinen Ilmari** (oletus) on edellä kuvattu reitti –
+kuva menee työaseman palvelimelle ja sieltä aiops-välittäjälle, eikä API-avainta tarvita. **API-avain** käyttää
+Node-palvelimen (`server/`) olemassa olevaa `/api/ai/draft`-reittiä: selain lähettää kuvan base64:nä JSONissa
+(enintään 2 Mt, kirjautuminen palvelusalasanalla, `consent: true`, tyhjä teksti riittää) ja palvelin kutsuu OpenAIta
+palvelimella olevalla avaimellaan; avain ei ole selaimessa. API vastaa AIDraft-luonnoksella, joten laji pitää päätellä:
+`per100`-rivi tulkitaan tuoteselosteeksi, muuten ateriaksi. Alkuperä ja oletukset kertovat avaimen ja mallin
+(`draft.provenance.model`), eivät rooli. Molemmat lähteet tallentavat aterian samalla `saveMeal`-polulla, ja virheet
+(avain puuttuu 503, päiväkatto 429, ei yhteyttä) näkyvät suomenkielisinä eivätkä muuta päiväkirjaa. Valinta tallentuu
+`settings`-tauluun (`kuvantunnistus`, puuttuva = `ilmari`) ja synkronoituu laitteiden välillä.
+
 **Roolin valinta.** Asetukset → Kuvantulkinta: Hubin valinta, Pilvi tai Paikallinen. Valinta tallentuu päiväkirjan
 `settings`-tauluun (`kuvantulkinta`, puuttuva = `kuva_tulkki`) ja synkronoituu laitteiden välillä; sama vaihto on
-Ilmari Hubissa. Node-palvelimella (`server/`) reittiä ei ole.
+Ilmari Hubissa. Roli koskee vain Ilmari-lähdettä: Node-palvelimella (`server/`) ei ole `/api/kuva-ateria`-reittiä,
+ja API-avaimen reitti valitsee mallin palvelimen asetuksesta (`OPENAI_MODEL`).
 
 ## Tavoitteet luonnollisesta kielestä
 

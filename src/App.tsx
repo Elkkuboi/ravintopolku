@@ -4,6 +4,7 @@ import {
   tulkitseKuva,
   ateriaKuvasta,
   OLETUSROOLI,
+  OLETUSLAHDE,
   ROOLIN_NIMI,
 } from "./ai/kuva-ateria";
 import { compressPhoto } from "./data/photos";
@@ -169,7 +170,8 @@ export default function App() {
     setDialog(d);
   };
   const kuvaRooli = data.settings[0]?.kuvantulkinta ?? OLETUSROOLI;
-  // Kuvasta ateria (aiops ADR-0027): kuva -> työaseman palvelin -> välittäjä -> ateria heti päiväkirjaan.
+  const kuvaLahde = data.settings[0]?.kuvantunnistus ?? OLETUSLAHDE;
+  // Kuvasta ateria (aiops ADR-0027): kuva -> lähde (paikallinen Ilmari tai palvelimen API-avain) -> ateria heti päiväkirjaan.
   const kuvaaAteria = (file: File) =>
     void run(async () => {
       if (demo) return;
@@ -181,7 +183,13 @@ export default function App() {
         } catch {
           photo = null; // kuva lähetetään silti; ateriaan jää merkintä, ettei kuvaa tallennettu
         }
-        const tulos = await tulkitseKuva(photo?.blob ?? file, kuvaRooli, date);
+        const tulos = await tulkitseKuva(
+          photo?.blob ?? file,
+          kuvaRooli,
+          date,
+          fetch,
+          kuvaLahde,
+        );
         const meal = ateriaKuvasta(tulos, date, defaultMealTime(date), photo);
         await saveMeal(meal, photo);
         setToast({
@@ -479,11 +487,11 @@ export default function App() {
                         </p>
                       ) : (
                         <p className="small muted">
-                          Ateria tai pakkauksen tuoteseloste yhdestä kuvasta,
-                          ilman muita kenttiä. Kuva lähetetään työaseman
-                          palvelimen kautta tulkittavaksi (
-                          {ROOLIN_NIMI[kuvaRooli]}
-                          ). Ateria tallentuu heti; voit muokata sitä.
+                          {`Ateria tai pakkauksen tuoteseloste yhdestä kuvasta, ilman muita kenttiä. Kuva tulkitaan ${
+                            kuvaLahde === "api"
+                              ? "palvelimen API-avaimella (OpenAI)"
+                              : `työaseman palvelimen kautta paikallisella Ilmarilla (rooli ${ROOLIN_NIMI[kuvaRooli]})`
+                          }. Ateria tallentuu heti; voit muokata sitä.`}
                         </p>
                       )}
                     </div>

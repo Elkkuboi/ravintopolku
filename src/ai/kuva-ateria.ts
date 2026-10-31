@@ -1,17 +1,21 @@
 // Kuvasta ateria (aiops ADR-0025/-0027): kuva lähetetään työaseman palvelimelle, joka kutsuu aiops-välittäjää.
 //
 // Palvelin palauttaa AIDraft-luonnoksen, josta sovellus luo aterian heti päiväkirjaan ilman pakollisia kenttiä.
-// Rooli (model-kenttä välittäjälle) valitaan Asetuksista: Hubin valinta, pilvi tai paikallinen malli. Ilman
-// työaseman palvelinta tai välittäjää (404) toiminto ei ole käytössä ja päiväkirja toimii kuten ennenkin.
+// Lähde valitaan Asetuksista (kuvantunnistus): "ilmari" = paikallinen Ilmari työaseman palvelimen kautta,
+// "api" = palvelimen (server/) API-avain OpenAIhin. Ilmarin rooli (model-kenttä välittäjälle) valitaan
+// erikseen: Hubin valinta, pilvi tai paikallinen malli. Ilman palvelinta, välittäjää tai API-avainta
+// toiminto ei ole käytössä ja päiväkirja toimii kuten ennenkin.
 import { z } from "zod";
-import { draftSchema } from "./provider";
-import { apiURL } from "./client";
+import { draftSchema, type AIDraft } from "./provider";
+import { apiURL, HttpProvider } from "./client";
 import { draftNotes } from "./draft-fields";
 import {
   type Meal,
   type MealLine,
   type Photo,
   kuvaRooliSchema,
+  kuvaLahdeSchema,
+  type KuvaLahde,
   stamped,
   id,
   TIMEZONE,
@@ -27,26 +31,82 @@ export const ROOLIN_NIMI: Record<KuvaRooli, string> = {
   kuva_tulkki_pilvi: "Pilvi (kuva_tulkki_pilvi)",
   kuva_tulkki_paikallinen: "Paikallinen (kuva_tulkki_paikallinen)",
 };
+export const KUVA_LAHTEET = kuvaLahdeSchema.options;
+export type { KuvaLahde };
+export const OLETUSLAHDE: KuvaLahde = "ilmari";
+export const LAHTEEN_NIMI: Record<KuvaLahde, string> = {
+  ilmari: "Paikallinen Ilmari (työaseman palvelin, ei API-avainta)",
+  api: "API-avain (OpenAI-palvelin)",
+};
 export const KUVA_MAX = 8 * 1024 * 1024;
+// API-avaimen reitti (server/) ottaa vastaan enintään 2 Mt:n kuvan; työaseman välittäjä 8 Mt.
+export const KUVA_API_MAX = 2 * 1024 * 1024;
 
 export const kuvaTulosSchema = z.object({
   draft: draftSchema,
   kind: z.enum(["ateria", "tuoteseloste"]),
   rooli: kuvaRooliSchema,
 });
-export type KuvaTulos = z.infer<typeof kuvaTulosSchema>;
+export type KuvaTulos = {
+  draft: AIDraft;
+  kind: "ateria" | "tuoteseloste";
+  /** Ilmarin rooli (model-kenttä) tai "API-avain", kun kuva tulkittiin palvelimen avaimella. */
+  rooli: string;
+  /** Moottori: paikallinen Ilmari (oletus) tai palvelimen API-avain. */
+  lahde?: KuvaLahde;
+};
 
-/** Lähettää kuvan palvelimelle ja palauttaa tarkistetun luonnoksen. Heittää suomenkielisen virheen. */
+/** Kehote API-avaimen reitille: kuva on ainoa syöte, joten laji (annos vs. seloste) päätellään luonnoksesta. */
+export const API_KEHOTE =
+  "Kuva on ainoa syöte: tulkitse joko ruoka-annos (portion, koko annoksen arvot) tai pakkauksen " +
+  "tuoteseloste (per100, pakkauksen massa grammoina). Älä kysy lisätietoja.";
+
+/** API-luonnoksesta ei tule lajia mukana: per100-rivi kertoo tuoteselosteesta. */
+export function paatteleLaji(draft: AIDraft): KuvaTulos["kind"] {
+  return draft.lines.some((l) => l.mode === "per100")
+    ? "tuoteseloste"
+    : "ateria";
+}
+
+/** Kuva palvelimen /api/ai/draft-reitille, joka käyttää palvelimen API-avainta; avain ei ole selaimessa. */
+export async function tulkitseKuvaApi(
+  kuva: Blob,
+  hae: typeof fetch = fetch,
+): Promise<KuvaTulos> {
+  if (kuva.size > KUVA_API_MAX)
+    throw new Error(
+      "Kuva on liian suuri API-avaimelle (enintään 2 Mt). Valitse pienempi kuva tai ota käyttöön paikallinen Ilmari.",
+    );
+  let draft: AIDraft;
+  try {
+    draft = await new HttpProvider(
+      { imageInput: true, structuredOutput: true },
+      undefined,
+      hae,
+      "Kuvantunnistuksen API-avaimen reittiä ei ole tässä osoitteessa. Valitse paikallinen Ilmari tai käynnistä palvelin, jolla on API-avain.",
+    ).interpret("portion", { text: API_KEHOTE, image: kuva });
+  } catch (e) {
+    // Providerin raaka virhe (Zod) ei kelpaa käyttäjälle: palvelimen vastaus hylätään kokonaan.
+    if (e instanceof z.ZodError)
+      throw new Error("Palvelimen vastaus ei kelpaa. Mitään ei tallennettu.");
+    throw e;
+  }
+  return { draft, kind: paatteleLaji(draft), rooli: "API-avain", lahde: "api" };
+}
+
+/** Lähettää kuvan valitulla lähteellä ja palauttaa tarkistetun luonnoksen. Heittää suomenkielisen virheen. */
 export async function tulkitseKuva(
   kuva: Blob,
   rooli: KuvaRooli,
   pvm: string,
   hae: typeof fetch = fetch,
+  lahde: KuvaLahde = OLETUSLAHDE,
 ): Promise<KuvaTulos> {
   if (kuva.size > KUVA_MAX)
     throw new Error(
       "Kuva on liian suuri (enintään 8 Mt). Valitse pienempi kuva.",
     );
+  if (lahde === "api") return tulkitseKuvaApi(kuva, hae);
   const runko = new FormData();
   runko.append("kuva", kuva, "ateria.jpg");
   runko.append("rooli", rooli);
@@ -77,7 +137,7 @@ export async function tulkitseKuva(
   const tulos = kuvaTulosSchema.safeParse(body);
   if (!tulos.success)
     throw new Error("Palvelimen vastaus ei kelpaa. Mitään ei tallennettu.");
-  return tulos.data;
+  return { ...tulos.data, lahde };
 }
 
 /** Ateriatyyppi kellonajan mukaan; käyttäjä voi vaihtaa sen muokkauksessa. */
@@ -90,14 +150,18 @@ export function ateriatyyppi(time: string): Meal["type"] {
   return "Iltapala";
 }
 
-/** Luo tallennettavan aterian luonnoksesta: alkuperä ja oletukset kertovat kuvasta ja roolista. */
+/** Luo tallennettavan aterian luonnoksesta: alkuperä ja oletukset kertovat kuvasta ja lähteestä. */
 export function ateriaKuvasta(
   tulos: KuvaTulos,
   date: string,
   time: string,
   photo: Photo | null,
 ): Meal {
-  const alkupera = `Kuvasta (rooli ${tulos.rooli})`;
+  const malli = tulos.draft.provenance.model;
+  const alkupera =
+    tulos.lahde === "api"
+      ? `Kuvasta (API-avain${malli ? ": " + malli : ""})`
+      : `Kuvasta (rooli ${tulos.rooli})`;
   const oletukset: string[] = [alkupera];
   const lines: MealLine[] = tulos.draft.lines.map((l) => {
     const grams = l.mode === "per100" && l.grams === null ? 100 : l.grams;

@@ -266,6 +266,27 @@ describe("OpenAI Responses -sopimus", () => {
       ),
     ).rejects.toThrow("ei kelpaa");
   });
+  it("pelkkä kuva riittää: Kuvasta ateria -toiminto API-avaimella ei lähetä tekstiä", async () => {
+    const png = readFileSync("public/icon-192.png").toString("base64");
+    const draft = await analyze(
+      config(),
+      { ...input, text: "", image: { mime: "image/png", base64: png } },
+      new AbortController().signal,
+      async (_url, options) => {
+        const body = JSON.parse(String(options.body));
+        expect(body.input[0].content[0].text).toContain("Käyttäjän kuvaus");
+        expect(body.input[0].content[1].image_url).toBe(
+          "data:image/png;base64," + png,
+        );
+        return success(_url, options);
+      },
+    );
+    expect(draft.lines.length).toBeGreaterThan(0);
+    expect(draft.provenance).toMatchObject({
+      provider: "OpenAI API",
+      model: "testi-model",
+    });
+  });
   it("rikkinäinen JSON, negatiiviset arvot, refusal ja keskeneräinen output eivät avaudu luonnokseksi", async () => {
     const c = config();
     const d = await new MockProvider().interpret();

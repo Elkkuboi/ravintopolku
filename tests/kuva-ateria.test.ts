@@ -1,13 +1,22 @@
 // Kuvasta ateria (aiops ADR-0027): asiakaspuoli käsin kirjoitetuilla palvelinvastauksilla ja aterian muodostus.
+// Lähteen valinta: paikallinen Ilmari (välittäjä) tai palvelimen API-avain (server/ → OpenAI).
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   tulkitseKuva,
+  tulkitseKuvaApi,
+  paatteleLaji,
   ateriaKuvasta,
   ateriatyyppi,
   KUVA_ROOLIT,
+  KUVA_LAHTEET,
+  OLETUSLAHDE,
   ROOLIN_NIMI,
+  LAHTEEN_NIMI,
+  API_KEHOTE,
+  KUVA_API_MAX,
   type KuvaTulos,
 } from "../src/ai/kuva-ateria";
+import { type AIDraft } from "../src/ai/provider";
 import { mealSchema, settingsSchema, stamped, id } from "../src/domain/model";
 import { DiaryDB, saveMeal, readDataset, saveRecord } from "../src/data/db";
 
@@ -17,6 +26,7 @@ const kuva = new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0,
 const tulos: KuvaTulos = {
   kind: "ateria",
   rooli: "kuva_tulkki_pilvi",
+  lahde: "ilmari",
   draft: {
     schemaVersion: 1,
     name: "Lihapullat ja muusi",
@@ -29,6 +39,17 @@ const tulos: KuvaTulos = {
     unknowns: ["Lihapullat: kuitu"], assumptions: ["Muusissa on voita"], questions: ["Oliko kastiketta?"],
     provenance: { provider: "aiops-välittäjä / kuva_tulkki_pilvi", model: "gpt-testi", note: "Kuvasta tulkittu arvio." },
   },
+};
+// API-avaimen luonnos: /api/ai/draft palauttaa AIDraftin, ei kuorta eikä roolia.
+const avainLuonnos: AIDraft = {
+  schemaVersion: 1,
+  name: "Kaurapuuro ja marjat",
+  lines: [
+    { name: "Kaurapuuro", mode: "portion", grams: 250,
+      values: { energy: 190, protein: 7, carbs: 30, fat: 5, fiber: 5 }, source: "Kuvasta arvioitu annos", state: "keitettynä" },
+  ],
+  unknowns: ["Marjojen massa"], assumptions: ["Rasva on voita"], questions: [],
+  provenance: { provider: "OpenAI API", model: "testi-model", note: "Käyttäjän pyytämä AI-arvio." },
 };
 const databases: DiaryDB[] = [];
 afterEach(async () => {
@@ -62,6 +83,81 @@ describe("tulkitseKuva", () => {
       .rejects.toThrow("ei saada yhteyttä");
     await expect(tulkitseKuva(new Blob([new Uint8Array(8 * 1024 * 1024 + 1)]), "kuva_tulkki", "2026-10-28"))
       .rejects.toThrow("liian suuri");
+  });
+});
+
+describe("kuvan tulkinta API-avaimella", () => {
+  it("lähettää kuvan palvelimen /api/ai/draft-reitille JSON-pyyntönä ilman roolia", async () => {
+    const hae = vi.fn(async () => vastaus(avainLuonnos));
+    const tulos = await tulkitseKuva(kuva, "kuva_tulkki", "2026-10-28", hae as unknown as typeof fetch, "api");
+    const [url, init] = hae.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/ai/draft");
+    expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("same-origin");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect((init.headers as Record<string, string>)["X-Ravintopolku"]).toBe("1");
+    const runko = JSON.parse(String(init.body));
+    expect(runko.task).toBe("portion");
+    expect(runko.consent).toBe(true);
+    expect(runko.text).toBe(API_KEHOTE);
+    expect(runko.image).toEqual({ mime: "image/jpeg", base64: "/9j/4AAAAAAAAAAA" });
+    expect(tulos).toEqual({ draft: avainLuonnos, kind: "ateria", rooli: "API-avain", lahde: "api" });
+    expect(hae).toHaveBeenCalledTimes(1);
+  });
+
+  it("tuoteseloste tunnistetaan per100-rivistä, muuten tulos on ateria", async () => {
+    const seloste: AIDraft = { ...avainLuonnos, lines: [{ ...avainLuonnos.lines[0], mode: "per100", grams: null }] };
+    expect(paatteleLaji(avainLuonnos)).toBe("ateria");
+    expect(paatteleLaji(seloste)).toBe("tuoteseloste");
+    const tulos = await tulkitseKuva(kuva, "kuva_tulkki", "2026-10-28", async () => vastaus(seloste), "api");
+    expect(tulos.kind).toBe("tuoteseloste");
+    expect(tulos.lahde).toBe("api");
+  });
+
+  it("näyttää palvelimen suomenkielisen virheen, kelvottoman vastauksen ja yhteydenmenetyksen", async () => {
+    await expect(tulkitseKuva(kuva, "kuva_tulkki", "2026-10-28", async () => vastaus({ error: "Määritä OpenAI-avain ja malli palvelimelle ensin." }, 503), "api"))
+      .rejects.toThrow("Määritä OpenAI-avain");
+    await expect(tulkitseKuva(kuva, "kuva_tulkki", "2026-10-28", async () => vastaus({ virhe: "tuntematon reitti" }, 404), "api"))
+      .rejects.toThrow("API-avaimen reittiä ei ole tässä osoitteessa");
+    await expect(tulkitseKuva(kuva, "kuva_tulkki", "2026-10-28", async () => vastaus({ error: "Palvelimella on käytetty päivittäinen AI-katto." }, 429), "api"))
+      .rejects.toThrow("päivittäinen AI-katto");
+    await expect(tulkitseKuva(kuva, "kuva_tulkki", "2026-10-28", async () => vastaus({ nimeke: "ei luonnosta" }), "api"))
+      .rejects.toThrow("vastaus ei kelpaa");
+    await expect(tulkitseKuva(kuva, "kuva_tulkki", "2026-10-28", async () => { throw new TypeError("offline"); }, "api"))
+      .rejects.toThrow("AI-palveluun ei saada yhteyttä");
+  });
+
+  it("API-avain hylkää liian suuren kuvan lähettämättä sitä", async () => {
+    const hae = vi.fn(async () => vastaus(avainLuonnos));
+    await expect(tulkitseKuvaApi(new Blob([new Uint8Array(KUVA_API_MAX + 1)]), hae as unknown as typeof fetch))
+      .rejects.toThrow("enintään 2 Mt");
+    expect(hae).not.toHaveBeenCalled();
+    await expect(tulkitseKuva(new Blob([new Uint8Array(KUVA_API_MAX + 1)]), "kuva_tulkki", "2026-10-28", hae as unknown as typeof fetch, "api"))
+      .rejects.toThrow("enintään 2 Mt");
+    await expect(tulkitseKuva(new Blob([new Uint8Array(8 * 1024 * 1024 + 1)]), "kuva_tulkki", "2026-10-28", hae as unknown as typeof fetch, "api"))
+      .rejects.toThrow("enintään 8 Mt");
+    expect(hae).not.toHaveBeenCalled();
+  });
+
+  it("API-aterian alkuperä kertoo avaimen ja mallin, ei Ilmarin roolia", () => {
+    const meal = ateriaKuvasta({ draft: avainLuonnos, kind: "ateria", rooli: "API-avain", lahde: "api" }, "2026-10-28", "08:00", null);
+    expect(() => mealSchema.parse(meal)).not.toThrow();
+    expect(meal.type).toBe("Aamiainen");
+    expect(meal.note).toBe("Kaurapuuro ja marjat");
+    expect(meal.origin).toBe("Kuvasta (API-avain: testi-model): ruoka-annos");
+    expect(meal.snapshot).toEqual({ energy: 190, protein: 7, carbs: 30, fat: 5, fiber: 5 });
+    expect(meal.assumptions).toEqual([
+      "Kuvasta (API-avain: testi-model)", "Kuvaa ei tallennettu laitteelle.",
+      "Alkuperän lisätieto: Käyttäjän pyytämä AI-arvio.", "Rasva on voita", "Tuntematon: Marjojen massa",
+    ]);
+  });
+
+  it("lähteen valinta: paikallinen Ilmari on oletus", () => {
+    expect(KUVA_LAHTEET).toEqual(["ilmari", "api"]);
+    expect(OLETUSLAHDE).toBe("ilmari");
+    expect(LAHTEEN_NIMI.ilmari).toContain("Ilmari");
+    expect(LAHTEEN_NIMI.api).toContain("API-avain");
+    expect(Object.keys(LAHTEEN_NIMI).sort()).toEqual([...KUVA_LAHTEET].sort());
   });
 });
 
@@ -108,5 +204,28 @@ describe("kuvantulkinnan asetus", () => {
     databases.push(db);
     await saveRecord("settings", { ...stamped(), theme: "dark", kuvantulkinta: "kuva_tulkki_paikallinen" }, db);
     expect((await readDataset(db)).settings[0].kuvantulkinta).toBe("kuva_tulkki_paikallinen");
+  });
+});
+
+describe("kuvatunnistuksen lähteen asetus", () => {
+  it("kuvantunnistus tallentuu settings-tauluun ja säilyttää roolin", async () => {
+    expect(settingsSchema.parse({ ...stamped(), theme: "system" }).kuvantunnistus).toBeUndefined();
+    expect(settingsSchema.parse({ ...stamped(), theme: "system", kuvantunnistus: "api" }).kuvantunnistus).toBe("api");
+    expect(() => settingsSchema.parse({ ...stamped(), theme: "system", kuvantunnistus: "openai" })).toThrow();
+    const db = new DiaryDB("test-" + id());
+    databases.push(db);
+    await saveRecord("settings", { ...stamped(), theme: "dark", kuvantunnistus: "api", kuvantulkinta: "kuva_tulkki_paikallinen" }, db);
+    const asetus = (await readDataset(db)).settings[0];
+    expect(asetus.kuvantunnistus).toBe("api");
+    expect(asetus.kuvantulkinta).toBe("kuva_tulkki_paikallinen");
+  });
+
+  it("vanha asetus ilman lähdekenttää tarkoittaa paikallista Ilmaria", async () => {
+    const db = new DiaryDB("test-" + id());
+    databases.push(db);
+    await saveRecord("settings", { ...stamped(), theme: "system" }, db);
+    const data = await readDataset(db);
+    expect(data.settings[0].kuvantunnistus).toBeUndefined();
+    expect(data.settings[0].kuvantunnistus ?? OLETUSLAHDE).toBe("ilmari");
   });
 });

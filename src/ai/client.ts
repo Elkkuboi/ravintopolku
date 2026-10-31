@@ -7,10 +7,17 @@ import {
 import { statusSchema, type APIStatus } from "./contracts";
 export const apiURL = (path: string) =>
   import.meta.env.BASE_URL + "api/" + path;
-export async function apiRequest(path: string, options: RequestInit = {}) {
+// `hae` on näkyvissä vain testejä varten: tuotannossa käytetään selaimen fetchiä.
+// `virhe404` on valinnainen suomenkielinen viesti, kun reittiä ei ole tämän palvelimen osoitteessa.
+export async function apiRequest(
+  path: string,
+  options: RequestInit = {},
+  hae: typeof fetch = fetch,
+  virhe404?: string,
+) {
   let response: Response;
   try {
-    response = await fetch(apiURL(path), {
+    response = await hae(apiURL(path), {
       credentials: "same-origin",
       ...options,
       headers: {
@@ -38,9 +45,11 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
   }
   if (!response.ok) {
     const error =
-      body && typeof body === "object" && "error" in body
-        ? String(body.error)
-        : "Palvelupyyntö epäonnistui.";
+      response.status === 404 && virhe404
+        ? virhe404
+        : body && typeof body === "object" && "error" in body
+          ? String(body.error)
+          : "Palvelupyyntö epäonnistui.";
     throw new Error(error);
   }
   return body;
@@ -70,12 +79,18 @@ export class HttpProvider implements AIProvider {
   name = "OpenAI API";
   capabilities: { imageInput: boolean; structuredOutput: boolean };
   private signal?: AbortSignal;
+  private hae: typeof fetch;
+  private virhe404?: string;
   constructor(
     capabilities = { imageInput: true, structuredOutput: true },
     signal?: AbortSignal,
+    hae: typeof fetch = fetch,
+    virhe404?: string,
   ) {
     this.capabilities = capabilities;
     this.signal = signal;
+    this.hae = hae;
+    this.virhe404 = virhe404;
   }
   async interpret(
     task: AITask,
@@ -83,16 +98,21 @@ export class HttpProvider implements AIProvider {
   ): Promise<AIDraft> {
     if (input.image && !this.capabilities.imageInput)
       throw new Error("Mallin kuvasyöte ei ole käytössä.");
-    const body = await apiRequest("ai/draft", {
-      method: "POST",
-      body: JSON.stringify({
-        task,
-        text: input.text ?? "",
-        image: input.image ? await encodeImage(input.image) : null,
-        consent: true,
-      }),
-      signal: this.signal,
-    });
+    const body = await apiRequest(
+      "ai/draft",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          task,
+          text: input.text ?? "",
+          image: input.image ? await encodeImage(input.image) : null,
+          consent: true,
+        }),
+        signal: this.signal,
+      },
+      this.hae,
+      this.virhe404,
+    );
     return draftSchema.parse(body);
   }
 }
