@@ -61,4 +61,11 @@ AIDraft-luonnokseksi ja tarkistaa sen `luonnokset.tarkista_luonnos`-säännöill
 samalla `saveMeal`-polulla kuin lomake; snapshot lasketaan `nutrition.ts`:ssä. Tämä on ainoa toiminto, jossa AI:n luonnos
 tallentuu ilman lomakkeen tarkistusta; alkuperä ja oletukset jäävät ateriaan näkyviin.
 
+Tavoitteet sanoin: `src/ai/tavoitteet.ts` lähettää vapaan tekstin reitille `/api/tavoitteet`, ja Python-palvelimen
+`tavoitteet.py` kutsuu samaa välittäjää (`kuva.kutsu`) roolilla `tavoite_ehdottaja*` ja muuntaa mallin JSONin
+tavoitearvoiksi. Toisin kuin kuvassa, mitään ei tallenneta automaattisesti: Asetukset näyttää numerot muokattavina, ja
+hyväksytty arvo kirjoittuu `saveGoal`-funktiolla tämän päivän tavoitteeksi. Samat äärirajat (energia 800–6000 kcal,
+proteiini 30–250 g, hiilihydraatit 20–700 g, rasva 20–200 g) ja makrojen 10 %:n suhtatarkistus toistuvat molemmilla
+puolilla, joten mallinnumerot eivät koskaan mene sellaisenaan päiväkirjaan.
+
 Katso [AI-integraatio](ai-integration.md) ja [ILMARI-sopimus ja live-työn rajat](ilmari-integration.md). Tuleva aiops-adapteri ei saa ohittaa gatewayta, politiikkaa tai hyväksyntää. Tämän version Node-palvelin on henkilökohtainen valinnainen API-välittäjä, ei yleiskäyttöinen agenttialusta tai usean laitteen synkronointipalvelu.

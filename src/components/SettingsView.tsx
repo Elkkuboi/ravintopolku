@@ -15,7 +15,30 @@ import {
 } from "lucide-react";
 import { type Dataset, type Food, stamped } from "../domain/model";
 import { KUVA_ROOLIT, ROOLIN_NIMI, OLETUSROOLI } from "../ai/kuva-ateria";
-import { eraseAll, saveRecord, removeFood, removeTemplate } from "../data/db";
+import {
+  VALMIIT_TAVOITTEET,
+  TEKSTI_MAX,
+  ehdotaTavoitteet,
+  hyvaksyTavoite,
+  profiiliKuvaus,
+  tarkistaRajat,
+  vertaaMakroja,
+  ROOLIN_NIMI as EHDOTUKSEN_ROOLI,
+  type TavoiteEhdotus,
+} from "../ai/tavoitteet";
+import {
+  blankNutrientStrings,
+  nutrientStrings,
+  parseNutrients,
+  type NutrientStrings,
+} from "./form-values";
+import {
+  eraseAll,
+  saveGoal,
+  saveRecord,
+  removeFood,
+  removeTemplate,
+} from "../data/db";
 import {
   exportBackup,
   parseBackup,
@@ -26,8 +49,22 @@ import {
 import { csvExports } from "../data/csv";
 import { localDay } from "../domain/dates";
 import { formatNumber, goalForDay } from "../domain/nutrition";
-import { Field, Modal, Form } from "./common";
+import { Field, Modal, Form, NutrientFields } from "./common";
 import { useFormAction } from "./useFormAction";
+/** Keskeneräinenkin syöte kelpaa vertailuun: kelvoton teksti on tyhjä arvo, ei virhe. */
+function numerot(arvot: NutrientStrings) {
+  const arvo = (s: string) => {
+    const siistitty = s.trim(),
+      n = Number(siistitty.replace(",", "."));
+    return siistitty && Number.isFinite(n) ? n : null;
+  };
+  return {
+    energy: arvo(arvot.energy),
+    protein: arvo(arvot.protein),
+    carbs: arvo(arvot.carbs),
+    fat: arvo(arvot.fat),
+  };
+}
 export function SettingsView({
   data,
   onProfile,
@@ -55,13 +92,23 @@ export function SettingsView({
     [deleteConfirmation, setDeleteConfirmation] = useState(""),
     [showDelete, setShowDelete] = useState(false),
     [persistent, setPersistent] = useState<boolean | null>(null),
-    [search, setSearch] = useState("");
-  const { error, busy, execute } = useFormAction();
+    [search, setSearch] = useState(""),
+    [tavoiteKuvaus, setTavoiteKuvaus] = useState(""),
+    [ehdotus, setEhdotus] = useState<TavoiteEhdotus | null>(null),
+    [ehdotusArvot, setEhdotusArvot] = useState<NutrientStrings>(
+      blankNutrientStrings(),
+    );
+  const { error, busy, execute } = useFormAction(),
+    tavoite = useFormAction();
   useEffect(() => {
     void navigator.storage?.persisted?.().then(setPersistent);
   }, []);
   const p = data.profiles[0],
-    g = goalForDay(data.goals, localDay());
+    g = goalForDay(data.goals, localDay()),
+    uusinPaino =
+      [...data.weights].sort((a, b) => b.date.localeCompare(a.date))[0]?.kg ??
+      null,
+    makroVaroitus = ehdotus ? vertaaMakroja(numerot(ehdotusArvot)) : null;
   async function exportNow() {
     const b = await exportBackup();
     download(JSON.stringify(b, null, 2), `ravintopolku-${localDay()}.json`);
@@ -157,6 +204,121 @@ export function SettingsView({
             ))}
           </select>
         </Field>
+      </section>
+      <section className="card">
+        <div className="section-heading">
+          <h2>Tavoitteet omin sanoin</h2>
+        </div>
+        <p className="muted small">
+          Kirjoita tavoite vapaina sanoin tai valitse valmis kuvaus. Ilmari
+          ehdottaa päivän energia- ja makrotavoitteet sekä lyhyen perustelun, ja
+          sinä tarkistat luvut ennen tallentamista.
+        </p>
+        <Field
+          label="Tavoite sanoin"
+          hint="Esim. painon lievä pudotus tai rasvan muuttaminen lihakseksi — kirjota vapaasti."
+        >
+          <textarea
+            rows={2}
+            value={tavoiteKuvaus}
+            maxLength={TEKSTI_MAX}
+            placeholder="Kirjoita tavoite omin sanoin"
+            onChange={(e) => setTavoiteKuvaus(e.target.value)}
+          />
+        </Field>
+        <div className="button-row">
+          {VALMIIT_TAVOITTEET.map((kuvaus) => (
+            <button
+              key={kuvaus}
+              className="secondary"
+              type="button"
+              onClick={() => setTavoiteKuvaus(kuvaus)}
+            >
+              {kuvaus}
+            </button>
+          ))}
+          <button
+            className="primary"
+            type="button"
+            disabled={tavoite.busy}
+            onClick={() =>
+              void tavoite.execute(async () => {
+                const tulos = await ehdotaTavoitteet(tavoiteKuvaus, {
+                  profiili: profiiliKuvaus(p, {
+                    weight: uusinPaino,
+                    goalEnergy: g?.nutrients.energy ?? null,
+                  }),
+                });
+                setEhdotus(tulos);
+                setEhdotusArvot(
+                  nutrientStrings({
+                    ...tulos.ehdotus,
+                    fiber: g?.nutrients.fiber ?? null,
+                  }),
+                );
+              })
+            }
+          >
+            {tavoite.busy ? "Ilmari ehdottaa…" : "Ehdota tavoitteet"}
+          </button>
+        </div>
+        {tavoite.error && (
+          <p className="error" role="alert">
+            {tavoite.error}
+          </p>
+        )}
+        {ehdotus && (
+          <>
+            <div className="notice">
+              <p>
+                <strong>Ilmari ehdottaa</strong>{" "}
+                {ehdotus.perustelu || "perustelua ei saanut"}
+              </p>
+              <p className="small">
+                {EHDOTUKSEN_ROOLI[ehdotus.rooli]}
+                {ehdotus.malli ? ` · malli ${ehdotus.malli}` : ""} · voimaan{" "}
+                {localDay()}
+              </p>
+              {ehdotus.oletukset.length > 0 && (
+                <p className="small">{ehdotus.oletukset.join(" ")}</p>
+              )}
+              {makroVaroitus && <p>{makroVaroitus}</p>}
+            </div>
+            <NutrientFields value={ehdotusArvot} onChange={setEhdotusArvot} />
+            <div className="button-row">
+              <button
+                className="primary"
+                type="button"
+                disabled={tavoite.busy}
+                onClick={() =>
+                  void tavoite.execute(async () => {
+                    const arvot = parseNutrients(ehdotusArvot);
+                    tarkistaRajat(arvot);
+                    await saveGoal(hyvaksyTavoite(arvot, localDay(), g));
+                    setEhdotus(null);
+                    setTavoiteKuvaus("");
+                    notify(
+                      "Tavoitteet tallennettu. Korjaa lukuja tarvittaessa kohdassa Profiili ja tavoitteet.",
+                    );
+                  })
+                }
+              >
+                Hyväksy ja tallenna
+              </button>
+              <button
+                className="quiet"
+                type="button"
+                onClick={() => setEhdotus(null)}
+              >
+                Hylkää
+              </button>
+            </div>
+            <p className="small muted">
+              Hyväksyminen korvaa tämän päivän tavoitteen. Kuitu ja painotavoite
+              säilyvät ennallaan.
+            </p>
+          </>
+        )}
       </section>
       <section className="card">
         <div className="section-heading">

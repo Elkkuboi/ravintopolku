@@ -202,8 +202,14 @@ def _virheviesti(runko: bytes) -> str:
     return re.sub(r"\s+", " ", str(viesti))[:200] if isinstance(viesti, str) else ""
 
 
-def kutsu(soketti: str, runko: dict, rooli: str, aikaraja: float = AIKARAJA_S) -> dict:
-    """POST /v1/chat/completions välittäjän Unix-sokettiin. Muu kuin 200 on käyttäjälle näytettävä virhe."""
+def kutsu(soketti: str, runko: dict, rooli: str, aikaraja: float = AIKARAJA_S, *,
+          toiminto: str = "Kuvantulkinta", neuvo: str = "Valitse Asetuksista toinen kuvantulkinta.",
+          hidastu: str = "Yritä uudelleen tai kirjaa käsin.", tunniste: str = "kuva-ateria") -> dict:
+    """POST /v1/chat/completions välittäjän Unix-sokettiin. Muu kuin 200 on käyttäjälle näytettävä virhe.
+
+    Sanat `toiminto`, `neuvo`, `hidastu` ja `tunniste` voi vaihtaa, kun muu ominaisuus (esimerkiksi
+    tavoitteet, tavoitteet.py) käyttää samaa kutsua: viestit ja loki puhuvat siitä, mitä käyttäjä yritti.
+    """
     data = json.dumps(runko).encode("utf-8")
     yhteys = _UnixYhteys(soketti, aikaraja)
     alku = time.monotonic()
@@ -215,15 +221,15 @@ def kutsu(soketti: str, runko: dict, rooli: str, aikaraja: float = AIKARAJA_S) -
         tila = vastaus.status
         sisalto = vastaus.read(VASTAUS_MAX + 1)
     except (socket.timeout, TimeoutError):
-        loki.warning("kuva-ateria: välittäjä ei vastannut %.0f sekunnissa (rooli %s)", aikaraja, rooli)
-        raise Virhe(504, "Kuvantulkinta kesti liian kauan (yli 120 s). Yritä uudelleen tai kirjaa käsin.") from None
+        loki.warning("%s: välittäjä ei vastannut %.0f sekunnissa (rooli %s)", tunniste, aikaraja, rooli)
+        raise Virhe(504, f"{toiminto} kesti liian kauan (yli 120 s). {hidastu}") from None
     except (OSError, http.client.HTTPException) as e:
-        loki.warning("kuva-ateria: välittäjään ei saada yhteyttä: %s", e.__class__.__name__)
-        raise Virhe(503, "aiops-välittäjään ei saada yhteyttä. Kuvantulkinta ei ole nyt käytettävissä.") from None
+        loki.warning("%s: välittäjään ei saada yhteyttä: %s", tunniste, e.__class__.__name__)
+        raise Virhe(503, f"aiops-välittäjään ei saada yhteyttä. {toiminto} ei ole nyt käytettävissä.") from None
     finally:
         yhteys.close()
     kesto = time.monotonic() - alku
-    loki.info("kuva-ateria: rooli=%s tila=%d kesto=%.1fs", rooli, tila, kesto)
+    loki.info("%s: rooli=%s tila=%d kesto=%.1fs", tunniste, rooli, tila, kesto)
     if tila != 200:
         lisa = _virheviesti(sisalto)
         lisa = f" ({lisa})" if lisa else ""
@@ -231,10 +237,9 @@ def kutsu(soketti: str, runko: dict, rooli: str, aikaraja: float = AIKARAJA_S) -
             raise Virhe(402, "Viikon AI-budjetti on käytetty. Kokeile paikallista mallia tai odota budjetin "
                              "nollautumista." + lisa)
         if tila == 404:
-            raise Virhe(404, f"Roolille {rooli} ei ole mallia Ilmari Hubissa. Valitse Asetuksista toinen "
-                             "kuvantulkinta." + lisa)
+            raise Virhe(404, f"Roolille {rooli} ei ole mallia Ilmari Hubissa. {neuvo}" + lisa)
         if tila in (501, 503):
-            raise Virhe(503, "Kuvantulkinta ei ole juuri nyt käytettävissä välittäjässä." + lisa)
+            raise Virhe(503, f"{toiminto} ei ole juuri nyt käytettävissä välittäjässä." + lisa)
         if tila == 502:
             raise Virhe(502, "Mallin kutsu epäonnistui välittäjässä. Yritä uudelleen." + lisa)
         raise Virhe(502, f"Välittäjä vastasi {tila}." + lisa)

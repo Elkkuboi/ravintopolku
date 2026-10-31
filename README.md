@@ -146,3 +146,13 @@ sen muokattavaksi. Asennus: `scripts/asenna-tyoasema.sh` lisää rivin `valittaj
 tiedostoon `/etc/ravintopolku/palvelin.toml` itse, kun välittäjän soketti on olemassa (tai lisää se käsin ja käynnistä
 palvelu uudelleen). Sopimus, roolit ja rajat:
 [ILMARI-integraatio](docs/ilmari-integration.md#kuvasta-ateria-aiops-adr-0027).
+
+## Tavoitteet sanoin
+
+Asetusten **Tavoitteet omin sanoin** -kortissa kirjoittaa tavoitteensa vapaina sanoin ("painon lievä pudotus", "rasvan
+muuttaminen lihakseksi") tai valitsee valmiin kuvauksen. Sovellus lähettää tekstin työaseman palvelimelle, joka kutsuu
+aiops-välittäjää samalla soketilla ja rooliperinteellä (`tavoite_ehdottaja`) kuin kuvan; Ilmari ehdottaa päivän
+energia- ja makrotavoitteet sekä lyhyen perustelun. Ehdotus näkyy tarkistettavana ja korjattavana, ja vasta **Hyväksy ja
+tallenna** kirjoittaa päivän tavoitteen — hylätty tai epäonnistunut ehdotus ei muuta mitään. Numerot tarkistetaan
+äärirajojen ja makrojen suhteen sekä palvelimella että selaimessa. Roolit ja rajat:
+[ILMARI-integraatio](docs/ilmari-integration.md#tavoitteet-luonnollisesta-kielestä).
