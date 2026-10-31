@@ -137,11 +137,17 @@ export const templateSchema = z
   })
   .strict();
 export type MealTemplate = z.infer<typeof templateSchema>;
+// Päivän paino on aina valinnainen ja tallennetaan kiloina yhden desimaalin
+// tarkkuudella. Koodi pyöristää, ei käyttöliittymä: samasta luvusta tulee
+// aina samanarvoinen kirjaus, oli sen täyttänyt ihminen tai kone.
+export const PAINO_MIN = 10,
+  PAINO_MAX = 500;
+export const pyöristäPaino = (kg: number) => Number(kg.toFixed(1));
 export const weightSchema = z
   .object({
     ...stamp,
     date: daySchema,
-    kg: z.number().min(10).max(500),
+    kg: z.number().min(PAINO_MIN).max(PAINO_MAX).transform(pyöristäPaino),
     note: text,
   })
   .strict();

@@ -2,7 +2,7 @@
 
 ## Moduulit ja datan kulku
 
-`src/domain/model.ts` sisältää Zod-skeemat, yksiköt ja tyypit. `nutrition.ts` on ravintoaineiden ainoa laskentapaikka: per100-arvo × grammat / 100 tai annoksen ilmoitettu kokonaisarvo. Pakkauksen energiaa ei korvata makrolaskennalla. `dates.ts` vastaa Helsingin päivistä ja seinäkellon ajasta. `analytics.ts` käyttää raakakirjauksia. `src/data` toteuttaa Dexie-varaston, kuvat, viennit ja eristetyn demodatan. `src/ai` ei tunne tietokantaa eikä voi kirjoittaa sinne. `src/components` ja App ovat käyttöliittymä.
+`src/domain/model.ts` sisältää Zod-skeemat, yksiköt ja tyypit. `nutrition.ts` on ravintoaineiden ainoa laskentapaikka: per100-arvo × grammat / 100 tai annoksen ilmoitettu kokonaisarvo. Pakkauksen energiaa ei korvata makrolaskennalla. `dates.ts` vastaa Helsingin päivistä ja seinäkellon ajasta. `analytics.ts` käyttää raakakirjauksia. `paino.ts` on ainoa paikka, jossa vapaasta tekstistä poimitaan päivän paino ("paino 82,4"); epäselvää ei arvata, ja skeema pyöristää luvun yhteen desimaaliin. `src/data` toteuttaa Dexie-varaston, kuvat, viennit ja eristetyn demodatan. `src/ai` ei tunne tietokantaa eikä voi kirjoittaa sinne. `src/components` ja App ovat käyttöliittymä.
 
 UI validoi syötteen, muodostaa aterian ruokalistasta ja välittää sen `saveMeal`-funktiolle. Tietovarasto validoi uudelleen, laskee snapshotin ja ajankohdan sekä kirjoittaa aterian ja kuvan samassa transaktiossa. Dexien `useLiveQuery` päivittää näkymät kirjoituksen jälkeen. Myöhempi backend voi korvata tietovaraston rajat; puhtaat laskenta- ja analyysifunktiot sekä provider-sopimus säilyvät.
 
