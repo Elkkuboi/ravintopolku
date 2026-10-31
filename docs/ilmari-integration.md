@@ -105,8 +105,10 @@ Kuittaus on best effort: yhteysvirhe ei peru jo tallennettua ateriaa, ja luonnok
 
 ## Kuvasta ateria (aiops ADR-0027)
 
-Ateria syntyy **pelkästä kuvasta** ilman pakollisia kenttiä: kotinäkymän **Kuvaa ateria** -painike avaa kameran (tai
-kuvan valinnan), lähettää kuvan työaseman palvelimelle ja tallentaa palautetun luonnoksen heti valitun päivän ateriaksi.
+Ateria syntyy **pelkästä kuvasta** ilman pakollisia kenttiä: kotinäkymän **Kuvaa ateria** -painike antaa ottaa kuvan
+kameralla tai valita sen galleriasta, lähettää kuvan työaseman palvelimelle ja tallentaa palautetun luonnoksen heti
+valitun päivän ateriaksi. Lukujen täyttö ei kuulu käyttäjälle: kuvan mukana saa kirjoittaa vapaat lisätiedot
+(`vihje`, enintään 300 merkkiä), jotka menevät tulkitsijalle datana ja jäävät ateriaan näkyviin tarkistusta varten.
 Kuva voi olla ruoka-annos tai pakkauksen takaetiketti (ravintosisältö per 100 g ja pakkauksen paino). Ateriaan jää
 alkuperä `Kuvasta (rooli X)` ja mallin oletukset, puuttuvat tiedot ja kysymykset; ilmoituksen **Avaa** avaa aterian
 muokattavaksi. Pienennetty kuva tallentuu laitteelle kuten muissakin aterioissa (ei synkronoidu).
@@ -140,7 +142,8 @@ Rivi ilman yhtäkään arvoa hylätään; jos rivejä ei jää, vastaus on 422.
 **Rajapinta sovellukselle.** `POST /api/kuva-ateria`, `multipart/form-data` (sama Tailscale-tunnistus ja
 Origin-sääntö kuin muilla `/api`-reiteillä): kenttä `kuva` (JPEG/PNG/WebP taikatavuista tunnistettuna, enintään
 8 MiB), valinnaiset `rooli` (oletus `kuva_tulkki`), `pvm` (VVVV-KK-PP, palautetaan sellaisenaan) ja `vihje` (enintään
-300 merkkiä, liitetään kehotteeseen datana). Vastaus `{"draft": AIDraft (schemaVersion 1), "kind", "rooli", "pvm"}`;
+300 merkkiä, liitetään kehotteeseen datana; kehote käskee mallia ottamaan sen huomioon nimissä, grammoina ja arvioissa).
+Vastaus `{"draft": AIDraft (schemaVersion 1), "kind", "rooli", "pvm"}`;
 `draft.provenance.provider` on `aiops-välittäjä / <rooli>` ja `model` välittäjän ilmoittama malli. Virheet: 400 kelvoton
 kenttä tai kuva, 404 toiminto ei käytössä, 413 liian suuri, 415 väärä sisältötyyppi, 422 kuvasta ei saatu ateriaa,
 402/502/503/504 välittäjästä. Lokiin kirjataan rooli, tila ja kesto – ei kuvaa eikä mallin tekstiä.

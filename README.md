@@ -139,7 +139,10 @@ Tiedostomuoto ja säännöt: [ILMARI-integraatio](docs/ilmari-integration.md).
 ## Kuvasta ateria (aiops ADR-0027)
 
 Kotinäkymän **Kuvaa ateria** luo aterian pelkästä kuvasta – ruoka-annoksesta tai pakkauksen takaetiketistä (arvot
-per 100 g ja pakkauksen paino) – eikä vaadi muita kenttiä. Työaseman palvelin lähettää kuvan aiops-välittäjälle
+per 100 g ja pakkauksen paino) – eikä vaadi muita kenttiä. Kuvan voi ottaa kameralla tai valita galleriasta, ja kuvan
+mukana saa kirjoittaa vapaat lisätiedot (esim. "leivässä on kaksi viipaletta Oltermanni light -juustoa"): ne lähtevät
+välittäjälle tekoälylle datana ja jäävät ateriaan näkyviin, joten Eliakselle ei tule listattavia kenttiä. Työaseman
+palvelin lähettää kuvan aiops-välittäjälle
 Unix-soketissa; välittäjän rooli valitaan Asetukset → Kuvantulkinta (Hubin valinta, pilvi tai paikallinen malli) tai
 Ilmari Hubista. Ateria tallentuu heti alkuperällä `Kuvasta (rooli X)` ja mallin oletuksilla; ilmoituksen **Avaa** avaa
 sen muokattavaksi. Asennus: `scripts/asenna-tyoasema.sh` lisää rivin `valittaja = "/run/aiops-valittaja/valittaja.sock"`

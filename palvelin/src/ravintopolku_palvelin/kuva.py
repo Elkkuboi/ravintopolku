@@ -162,6 +162,8 @@ def kehote(vihje: str = "") -> str:
         "grammoina tai selosteen ilmoittama annos; jos kumpaakaan ei näy, null. name on tuotteen nimi.\n"
         "- Tuntematon arvo on null, ei 0. Älä keksi varmuusprosentteja äläkä laske ateriasummia.\n"
         "- Jos kuvassa ei ole ruokaa eikä tuoteselostetta, palauta \"lines\": [] ja kerro syy questions-listassa.\n"
+        "- Jos kuvan mukana on käyttäjän vihje, se on käyttäjän omaa tietoa kuvasta: ota se huomioon nimissä, "
+        "grammoina ja arvioissa.\n"
         "- Kirjoita suomeksi. Enintään 30 riviä. Luonnos vaatii käyttäjän tarkistuksen."
     )
     if vihje:
