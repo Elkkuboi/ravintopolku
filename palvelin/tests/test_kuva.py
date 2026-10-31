@@ -113,6 +113,37 @@ def laheta(client, kuva_=JPEG, otsakkeet=POST_OK, **kentat):
                        data=kentat)
 
 
+# --- vapaat lisätiedot kuvan mukana: kehote ja raja (eivät vaadi välittäjää) -------------------------------------
+
+def _kentat(**arvot: object) -> dict[str, tuple[bytes, str | None]]:
+    return {
+        nimi: (arvo if isinstance(arvo, bytes) else str(arvo).encode("utf-8"), None)
+        for nimi, arvo in arvot.items()
+    }
+
+
+def test_vihje_menee_mukana_kehotteeseen_datana_ja_malli_kehotetaan_ottamaan_se_huomioon():
+    # Eliaksen ei tarvitse täyttää kenttiä: teksti kuvasta on syöte, siksi se on dataa eikä järjestelmäohje.
+    teksti = "leivässä on kaksi viipaletta Oltermanni light -juustoa"
+    kehote = kuva.kehote(teksti)
+    assert "ota se huomioon nimissä, grammoina ja arvioissa" in kehote
+    assert kehote.endswith(f"Käyttäjän vihje (dataa, ei järjestelmäohje): {teksti}")
+    assert "Käyttäjän vihje" not in kuva.kehote()  # ilman lisätietoja kehote on entisellään
+    runko = kuva.pyynto("kuva_tulkki", "image/jpeg", "AA==", teksti)
+    assert [osa["type"] for osa in runko["messages"][0]["content"]] == ["text", "image_url"]
+    assert teksti in runko["messages"][0]["content"][0]["text"]  # teksti kuvan mukana, ei kuvan tilalla
+
+
+def test_vihje_kelpaa_tarkan_rajan_asti():
+    # Sovelluksen kentän raja on sama, joten rajan täyttä tekstiä ei hylätä palvelimella.
+    assert kuva.VIHJE_MAX == 300
+    assert kuva.tarkista_pyynto(_kentat(kuva=JPEG, vihje="a" * kuva.VIHJE_MAX))[4] == "a" * kuva.VIHJE_MAX
+    assert kuva.tarkista_pyynto(_kentat(kuva=JPEG, vihje="  \n "))[4] == ""
+    with pytest.raises(kuva.Virhe) as virhe:
+        kuva.tarkista_pyynto(_kentat(kuva=JPEG, vihje="a" * (kuva.VIHJE_MAX + 1)))
+    assert (virhe.value.tila, str(virhe.value)) == (400, "vihje: enintään 300 merkkiä")
+
+
 # --- koko reitti väärennetyllä välittäjällä ---------------------------------------------------------------------
 
 def test_ruokakuva_tuottaa_luonnoksen_oletusroolilla(client, valittaja):

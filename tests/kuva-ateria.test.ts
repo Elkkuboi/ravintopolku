@@ -126,6 +126,29 @@ describe("tulkitseKuva", () => {
     expect(LISATIEDOT_MAX).toBe(300); // sama raja kuin palvelimen VIHJE_MAX
   });
 
+  it("rajalla olevat lisätiedot menevät sellaisinaan välittäjälle ja näkyvät ateriaan asti", async () => {
+    // Selaimen piirroksen raja on sama kuin palvelimen VIHJE_MAX, joten näin ei koskaan saa 400-vastausta.
+    const rajanTeksti = "a".repeat(LISATIEDOT_MAX);
+    const hae = vi.fn(async () => vastaus({ ...tulos, pvm: "2026-10-28" }));
+    await tulkitseKuva(
+      kuva,
+      "kuva_tulkki",
+      "2026-10-28",
+      rajanTeksti,
+      hae as unknown as typeof fetch,
+    );
+    const runko = (hae.mock.calls[0] as unknown as [string, RequestInit])[1]
+      .body as FormData;
+    expect(runko.get("vihje")).toBe(rajanTeksti);
+    const meal = ateriaKuvasta(tulos, "2026-10-28", "12:30", null, rajanTeksti);
+    expect(() => mealSchema.parse(meal)).not.toThrow();
+    const db = new DiaryDB("test-" + id());
+    databases.push(db);
+    await saveMeal(meal, null, false, db);
+    const [tallennettu] = (await readDataset(db)).meals;
+    expect(tallennettu.assumptions).toContain(`Lisätiedot: ${rajanTeksti}`);
+  });
+
   it("näyttää palvelimen suomenkielisen virheen, 404:n ja kelvottoman vastauksen", async () => {
     await expect(
       tulkitseKuva(kuva, "kuva_tulkki", "2026-10-28", "", async () =>
@@ -293,6 +316,8 @@ describe("Kuvaa ateria -näkymä", () => {
   it("ottaa kuvan kameralla tai valitsee sen galleriasta: pakotettua kameraa ei ole", () => {
     expect(osa).toContain('type="file"');
     expect(osa).not.toContain("capture");
+    expect(osa).toContain('accept="image/*"'); // valitsin tarjoaa sekä kameran että gallerian
+    expect(osa).toMatch(/Ota kuva kameralla tai valitse\s+se galleriasta/);
   });
   it("antaa vapaan tekstikentän lisätiedoille ja vie ne sekä välittäjälle että ateriaan", () => {
     expect(osa).toContain("<textarea");
