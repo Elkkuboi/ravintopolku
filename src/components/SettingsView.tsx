@@ -14,7 +14,14 @@ import {
   Plus,
 } from "lucide-react";
 import { type Dataset, type Food, stamped } from "../domain/model";
-import { KUVA_ROOLIT, ROOLIN_NIMI, OLETUSROOLI } from "../ai/kuva-ateria";
+import {
+  KUVA_ROOLIT,
+  ROOLIN_NIMI,
+  OLETUSROOLI,
+  KUVA_LAHTEET,
+  LAHTEEN_NIMI,
+  OLETUSLAHDE,
+} from "../ai/kuva-ateria";
 import {
   VALMIIT_TAVOITTEET,
   TEKSTI_MAX,
@@ -180,8 +187,34 @@ export function SettingsView({
           </select>
         </Field>
         <Field
+          label="Kuvatunnistuksen lähde"
+          hint="Kuvaa ateria -toiminto: paikallinen Ilmari työaseman palvelimen kautta (ei API-avainta) tai palvelimen OpenAI-API-avain. Molemmat lähettävät kuvan palvelimelle; ateria tallentuu heti ja voit muokata sitä."
+        >
+          <select
+            value={data.settings[0]?.kuvantunnistus ?? OLETUSLAHDE}
+            onChange={(e) =>
+              void run(async () => {
+                await saveRecord("settings", {
+                  ...data.settings[0],
+                  ...stamped(data.settings[0]),
+                  theme: data.settings[0]?.theme ?? "system",
+                  kuvantunnistus: e.target
+                    .value as (typeof KUVA_LAHTEET)[number],
+                });
+                notify("Kuvatunnistuksen lähde tallennettu.");
+              })
+            }
+          >
+            {KUVA_LAHTEET.map((l) => (
+              <option key={l} value={l}>
+                {LAHTEEN_NIMI[l]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field
           label="Kuvantulkinta"
-          hint="Kuvaa ateria -toiminnon malli: Hub päättää roolin takana olevan mallin, tai pakota pilvi tai paikallinen malli. Sama valinta on Ilmari Hubissa."
+          hint="Kun lähteenä on paikallinen Ilmari: Hub päättää roolin takana olevan mallin, tai pakota pilvi tai paikallinen malli. Sama valinta on Ilmari Hubissa."
         >
           <select
             value={data.settings[0]?.kuvantulkinta ?? OLETUSROOLI}

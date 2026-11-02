@@ -4,6 +4,7 @@ import {
   tulkitseKuva,
   ateriaKuvasta,
   OLETUSROOLI,
+  OLETUSLAHDE,
   ROOLIN_NIMI,
   LISATIEDOT_MAX,
 } from "./ai/kuva-ateria";
@@ -171,7 +172,9 @@ export default function App() {
     setDialog(d);
   };
   const kuvaRooli = data.settings[0]?.kuvantulkinta ?? OLETUSROOLI;
-  // Kuvasta ateria (aiops ADR-0027): kuva ja vapaat lisätiedot -> työaseman palvelin -> välittäjä -> ateria heti päiväkirjaan.
+  const kuvaLahde = data.settings[0]?.kuvantunnistus ?? OLETUSLAHDE;
+  // Kuvasta ateria (aiops ADR-0027): kuva ja vapaat lisätiedot -> lähde (paikallinen Ilmari työaseman palvelimen
+  // kautta tai palvelimen API-avain) -> ateria heti päiväkirjaan.
   const kuvaaAteria = (file: File) =>
     void run(async () => {
       if (demo) return;
@@ -189,6 +192,8 @@ export default function App() {
           kuvaRooli,
           date,
           kuvaLisatiedot,
+          fetch,
+          kuvaLahde,
         );
         const meal = ateriaKuvasta(
           tulos,
@@ -507,11 +512,11 @@ export default function App() {
                           </p>
                         ) : (
                           <p className="small muted">
-                            Ateria tai pakkauksen tuoteseloste yhdestä kuvasta,
-                            ilman muita kenttiä. Ota kuva kameralla tai valitse
-                            se galleriasta. Kuva lähetetään työaseman palvelimen
-                            kautta tulkittavaksi ({ROOLIN_NIMI[kuvaRooli]}
-                            ). Ateria tallentuu heti; voit muokata sitä.
+                            {`Ateria tai pakkauksen tuoteseloste yhdestä kuvasta, ilman muita kenttiä. Ota kuva kameralla tai valitse se galleriasta. Kuva tulkitaan ${
+                              kuvaLahde === "api"
+                                ? "palvelimen API-avaimella (OpenAI)"
+                                : `työaseman palvelimen kautta paikallisella Ilmarilla (rooli ${ROOLIN_NIMI[kuvaRooli]})`
+                            }. Ateria tallentuu heti; voit muokata sitä.`}
                           </p>
                         )}
                       </div>

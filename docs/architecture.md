@@ -55,11 +55,14 @@ jonka Python-palvelin lukee huoltosilmukassa, tarkistaa samoin säännöin ja ta
 Tailscale-tunnistuksella (aiops ADR-0026). Sovelluksen luonnoslaatikko käyttää tätä reittiä; Node-palvelimen `/api/inbox`
 jää sen omaksi reitiksi.
 
-Kuvasta ateria (aiops ADR-0027): `src/ai/kuva-ateria.ts` lähettää kuvan reitille `/api/kuva-ateria`, ja Python-palvelimen
-`kuva.py` kutsuu aiops-välittäjää Unix-soketissa (rooli `kuva_tulkki*` model-kenttänä), muuntaa mallin JSONin
-AIDraft-luonnokseksi ja tarkistaa sen `luonnokset.tarkista_luonnos`-säännöillä. Sovellus luo aterian heti IndexedDB:hen
+Kuvasta ateria (aiops ADR-0027): `src/ai/kuva-ateria.ts` lähettää kuvan valitulla lähteellä (`settings.kuvantunnistus`).
+Oletus `ilmari` menee reitille `/api/kuva-ateria`, ja Python-palvelimen `kuva.py` kutsuu aiops-välittäjää Unix-soketissa
+(rooli `kuva_tulkki*` model-kenttänä), muuntaa mallin JSONin AIDraft-luonnokseksi ja tarkistaa sen
+`luonnokset.tarkista_luonnos`-säännöillä. Vaihtoehtoinen `api` käyttää `HttpProvider`ia (`src/ai/client.ts`) ja
+Node-palvelimen olemassa olevaa `/api/ai/draft`-reittiä, joten kuva tulkitaan palvelimen API-avaimella ilman
+välittäjää; laji (ateria/tuoteseloste) päätellään `per100`-rivistä. Molemmissa sovellus luo aterian heti IndexedDB:hen
 samalla `saveMeal`-polulla kuin lomake; snapshot lasketaan `nutrition.ts`:ssä. Tämä on ainoa toiminto, jossa AI:n luonnos
-tallentuu ilman lomakkeen tarkistusta; alkuperä ja oletukset jäävät ateriaan näkyviin.
+tallentuu ilman lomakkeen tarkistusta; alkuperä ja oletukset jäävät ateriaan näkyviin ja kertovat myös lähteen.
 
 Tavoitteet sanoin: `src/ai/tavoitteet.ts` lähettää vapaan tekstin reitille `/api/tavoitteet`, ja Python-palvelimen
 `tavoitteet.py` kutsuu samaa välittäjää (`kuva.kutsu`) roolilla `tavoite_ehdottaja*` ja muuntaa mallin JSONin
