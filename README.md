@@ -139,13 +139,15 @@ Tiedostomuoto ja säännöt: [ILMARI-integraatio](docs/ilmari-integration.md).
 ## Kuvasta ateria (aiops ADR-0027)
 
 Kotinäkymän **Kuvaa ateria** luo aterian pelkästä kuvasta – ruoka-annoksesta tai pakkauksen takaetiketistä (arvot
-per 100 g ja pakkauksen paino) – eikä vaadi muita kenttiä. **Lähteen** valitsee Asetukset → Kuvatunnistuksen lähde:
-**Paikallinen Ilmari** (oletus) vie kuvan työaseman palvelimelle, joka lähettää sen aiops-välittäjälle Unix-soketissa,
-tai **API-avain** vie kuvan Node-palvelimelle (`server/`), joka kutsuu OpenAIta palvelimella olevalla avaimella –
-avain ei ole selaimessa eivätkä API-avaimen reitit vaadi välittäjää. Ilmarin rooli valitaan Asetukset →
-Kuvantulkinta (Hubin valinta, pilvi tai paikallinen malli) tai Ilmari Hubista; rooli ei koske API-avaimen reittiä.
-Ateria tallentuu heti alkuperällä `Kuvasta (rooli X)` tai `Kuvasta (API-avain: malli)` ja mallin oletuksilla;
-ilmoituksen **Avaa** avaa sen muokattavaksi. API-avaimen reitti käyttää olemassa olevaa `/api/ai/draft`-reittiä
+per 100 g ja pakkauksen paino) – eikä vaadi muita kenttiä. Kuvan voi ottaa kameralla tai valita galleriasta, ja kuvan
+mukana saa kirjoittaa vapaat lisätiedot (esim. "leivässä on kaksi viipaletta Oltermanni light -juustoa"): ne lähtevät
+tulkitsijalle datana ja jäävät ateriaan näkyviin, joten Eliakselle ei tule listattavia kenttiä. **Lähteen** valitsee
+Asetukset → Kuvatunnistuksen lähde: **Paikallinen Ilmari** (oletus) vie kuvan työaseman palvelimelle, joka lähettää sen
+aiops-välittäjälle Unix-soketissa, tai **API-avain** vie kuvan Node-palvelimelle (`server/`), joka kutsuu OpenAIta
+palvelimella olevalla avaimella – avain ei ole selaimessa eivätkä API-avaimen reitit vaadi välittäjää. Ilmarin rooli
+valitaan Asetukset → Kuvantulkinta (Hubin valinta, pilvi tai paikallinen malli) tai Ilmari Hubista; rooli ei koske
+API-avaimen reittiä. Ateria tallentuu heti alkuperällä `Kuvasta (rooli X)` tai `Kuvasta (API-avain: malli)` ja mallin
+oletuksilla; ilmoituksen **Avaa** avaa sen muokattavaksi. API-avaimen reitti käyttää olemassa olevaa `/api/ai/draft`-reittiä
 (kirjautuminen palvelusalasanalla, kuva enintään 2 Mt), joten se toimii myös tietokoneella, jolla ei ole
 aiops-välittäjää. Asennus: `scripts/asenna-tyoasema.sh` lisää rivin `valittaja = "/run/aiops-valittaja/valittaja.sock"`
 tiedostoon `/etc/ravintopolku/palvelin.toml` itse, kun välittäjän soketti on olemassa (tai lisää se käsin ja käynnistä
