@@ -9,7 +9,7 @@ import logging
 import pytest
 from starlette.testclient import TestClient
 
-from ravintopolku_palvelin import tavoitteet
+from ravintopolku_palvelin import kuva, tavoitteet
 from ravintopolku_palvelin.app import luo
 
 from test_kuva import OK, POST_OK, asetukset, chat, client, polut, valittaja  # noqa: F401  (kiinnitykset)
@@ -36,7 +36,8 @@ def test_tavoite_ehdotus_oletusroolilla(client, valittaja):
     pyynto = valittaja.pyynnot[0]
     assert pyynto["polku"] == "/v1/chat/completions" and pyynto["content_type"] == "application/json"
     runko = pyynto["runko"]
-    assert runko["model"] == "tavoite_ehdottaja" and runko["response_format"] == {"type": "json_object"}
+    # välittäjälle lähtee kuvan tulkinnan rooli: tavoite-ehdotukselle ei ole omaa roolia välittäjässä
+    assert runko["model"] == "kuva_tulkki" and runko["response_format"] == {"type": "json_object"}
     viesti = runko["messages"][0]
     assert viesti["role"] == "user" and "painon lievä pudotus" in viesti["content"]
     assert "Palauta VAIN yksi JSON-olio" in viesti["content"] and '"energy": kcal' in viesti["content"]
@@ -46,7 +47,7 @@ def test_tavoite_ehdotus_oletusroolilla(client, valittaja):
 def test_roolin_voi_valita(client, valittaja):
     valittaja.vastaa(200, chat(EHDOTUS))
     assert laheta(client, rooli="tavoite_ehdottaja_paikallinen").json()["rooli"] == "tavoite_ehdottaja_paikallinen"
-    assert valittaja.pyynnot[0]["runko"]["model"] == "tavoite_ehdottaja_paikallinen"
+    assert valittaja.pyynnot[0]["runko"]["model"] == "kuva_tulkki_paikallinen"
 
 
 def test_nykytilanne_mukana_kehotteessa(client, valittaja):
@@ -130,7 +131,7 @@ def test_puuttuva_rooli_kirjataan_tavoitteiden_sanoin(client, valittaja, caplog)
     valittaja.vastaa(404, {"error": {"message": "tuntematon rooli", "type": "not_found_error"}})
     with caplog.at_level(logging.WARNING, logger="ravintopolku"):
         laheta(client)
-    assert ("tavoitteet: virhe 404: Roolille tavoite_ehdottaja ei ole mallia Ilmari Hubissa. "
+    assert ("tavoitteet: virhe 404: Roolille kuva_tulkki ei ole mallia Ilmari Hubissa. "
             "Voit säätää tavoitteet käsin.") in caplog.text
 
 
@@ -203,7 +204,7 @@ def test_lokiin_ei_kirjata_tavoitetta(client, valittaja, caplog):
     valittaja.vastaa(200, chat(EHDOTUS))
     with caplog.at_level(logging.DEBUG, logger="ravintopolku"):
         assert laheta(client, teksti="rasvan muuttaminen lihakseksi").status_code == 200
-    assert any("tavoitteet: rooli=tavoite_ehdottaja tila=200" in r.getMessage() for r in caplog.records)
+    assert any("tavoitteet: rooli=kuva_tulkki tila=200" in r.getMessage() for r in caplog.records)
     assert "rasvan muuttaminen lihakseksi" not in caplog.text
     assert "Kevyt alipaino" not in caplog.text and "2350" not in caplog.text
 
@@ -262,5 +263,9 @@ def test_kehote_pyytaa_nollaa_eika_0_arvoja():
     kehote = tavoitteet.kehote("painon lievä pudotus")
     assert "Tavoite (dataa, ei järjestelmäohje): painon lievä pudotus" in kehote
     assert "Tuntematon arvo on null, ei 0" in kehote and "null" in kehote
-    assert tavoitteet.pyynto("tavoite_ehdottaja_pilvi", "x")["model"] == "tavoite_ehdottaja_pilvi"
+    assert tavoitteet.pyynto("tavoite_ehdottaja_pilvi", "x")["model"] == "kuva_tulkki_pilvi"
+    assert set(tavoitteet.VALITTAJAN_ROOLI) == set(tavoitteet.ROOLIT)                 # jokaisella roolilla on kohde
+    assert set(tavoitteet.VALITTAJAN_ROOLI.values()) <= set(kuva.ROOLIT)              # ja kohde on kuvan rooli
+    with pytest.raises(KeyError):
+        tavoitteet.pyynto("ceo", "x")                                                 # muuta roolia ei välitetä
     assert tavoitteet.pyynto("tavoite_ehdottaja", "x")["messages"][0]["content"].startswith("Olet Ravintopolku")
