@@ -38,6 +38,9 @@ CSV:n desimaalierotin on piste, erotin pilkku, UTF-8 BOM. Null-arvot ovat tyhji�
 
 vite-plugin-pwa/Workbox precache sisältää kaikki sovellusresurssit, ei henkilökohtaisia tietoja. Service worker rekisteröidään prompt-tilassa. Uuden version ilmoitus ei pakota sivun latausta; päivityspainike ei ole käytettävissä lomakkeen ollessa auki. Käyttäjä tallentaa ensin. Päiväkirja ei säilytä avaimia tai tokeneita. localStoragessa on vain viimeksi tunnettu väri, jonka `public/vari.js` asettaa ennen ensimmäistä piirtoa; kirjasimet tulevat omasta alkuperästä (`public/fonts/`). API-vastauksia ei välimuistiteta. Tallennusvirheet ja quota-virheet näkyvät lomakkeessa tai ilmoituksessa. Persistent storagea pyydetään tallennusten yhteydessä.
 
+Kuvakkeiden nimissä on versio (`public/icon-192-v2.png`): uusi kuva saa uuden nimen, koska puhelimeen asennettu sovellus ei
+hae samasta osoitteesta uutta kuvaa.
+
 ## Työaseman palvelin
 
 `palvelin/` (Python, Starlette, uv) kuuntelee Unix-soketissa, ja Tailscale Serve välittää siihen portista 8443. Se

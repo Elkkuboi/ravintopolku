@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: "prompt",
         scope: base,
-        includeAssets: ["icon-192.png", "icon-512.png"],
+        includeAssets: ["icon-192-v2.png", "icon-512-v2.png"],
         manifest: {
           name: "Ravintopolku",
           short_name: "Ravintopolku",
@@ -33,19 +33,19 @@ export default defineConfig(({ mode }) => {
           theme_color: "#f1ead9",
           icons: [
             {
-              src: base + "icon-192.png",
+              src: base + "icon-192-v2.png",
               sizes: "192x192",
               type: "image/png",
               purpose: "any",
             },
             {
-              src: base + "icon-512.png",
+              src: base + "icon-512-v2.png",
               sizes: "512x512",
               type: "image/png",
               purpose: "any",
             },
             {
-              src: base + "icon-maskable.png",
+              src: base + "icon-maskable-v2.png",
               sizes: "512x512",
               type: "image/png",
               purpose: "maskable",
