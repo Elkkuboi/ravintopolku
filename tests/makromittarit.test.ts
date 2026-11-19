@@ -5,6 +5,11 @@ import {
   meterReading,
   meterKeys,
   meterUnit,
+  makroKeys,
+  naytaMittari,
+  energiaLuku,
+  energiaJaljella,
+  makroTeksti,
 } from "../src/components/makromittarit";
 import { line, meal } from "./fixtures";
 const total = (value: number | null, known = 1, missing = 0): Total => ({
@@ -104,5 +109,50 @@ describe("Makromittarit", () => {
       remaining: null,
       partial: true,
     });
+  });
+});
+
+// Tänään-sivun tekstit: luvut suomalaisittain (1 890), tuntematon on "ei tietoa" eikä nolla.
+const nbsp = (s: string | undefined) => s?.replace(/\u00a0/g, " ");
+describe("Energia ja makrot -tekstit", () => {
+  it("makrorivejä on neljä: proteiini, hiilihydraatit, rasva ja kuitu; Kehityksen mittarit ennallaan", () => {
+    expect(makroKeys).toEqual(["protein", "carbs", "fat", "fiber"]);
+    expect(meterKeys).toEqual(["energy", "protein", "carbs", "fat"]);
+  });
+  it("iso luku ja jäljellä", () => {
+    const r = meterReading(total(1890), 2200);
+    expect(nbsp(energiaLuku(r))).toBe("1 890");
+    expect(nbsp(energiaJaljella(r)?.teksti)).toBe("310 jäljellä");
+    expect(energiaJaljella(r)?.yli).toBe(false);
+  });
+  it("yli tavoitteen näkyy omana tekstinään", () => {
+    expect(energiaJaljella(meterReading(total(2320), 2200))).toEqual({
+      teksti: "yli 120",
+      yli: true,
+    });
+  });
+  it("osittainen summa: jäljellä on enimmäismäärä ja makrossa ≥", () => {
+    const r = meterReading(total(1890, 3, 1), 2200);
+    expect(nbsp(energiaJaljella(r)?.teksti)).toBe("enint. 310 jäljellä");
+    expect(makroTeksti(meterReading(total(84, 2, 1), 100))).toBe("≥84 / 100 g");
+  });
+  it("tyhjä päivä on 0, puuttuva tieto ei ole nolla", () => {
+    const tyhja = meterReading(total(null, 0, 0), 2200);
+    expect(energiaLuku(tyhja)).toBe("0");
+    expect(nbsp(energiaJaljella(tyhja)?.teksti)).toBe("2 200 jäljellä");
+    expect(naytaMittari(tyhja)).toBe(true);
+    expect(makroTeksti(meterReading(total(null, 0, 0), 30))).toBe("0 / 30 g");
+    const puuttuu = meterReading(total(null, 0, 2), 30);
+    expect(energiaLuku(puuttuu)).toBe("ei tietoa");
+    expect(energiaJaljella(puuttuu)).toBeNull();
+    expect(makroTeksti(puuttuu)).toBe("ei tietoa");
+    expect(naytaMittari(puuttuu)).toBe(false);
+  });
+  it("ilman tavoitetta ei mittaria eikä jäljellä-tekstiä", () => {
+    const r = meterReading(total(84), null);
+    expect(naytaMittari(r)).toBe(false);
+    expect(energiaJaljella(r)).toBeNull();
+    expect(makroTeksti(r)).toBe("84 g");
+    expect(makroTeksti(meterReading(total(180), 250))).toBe("180 / 250 g");
   });
 });
