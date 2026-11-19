@@ -6,7 +6,8 @@ POST ja DELETE hyväksytään vain omasta alkuperästä. Rajapinnassa ei ole ver
 aterialuonnokset luetaan pudotushakemistosta (aiops ADR-0026) ja tarjoillaan laatikkoon /api/luonnokset. Kuvasta
 ateria (/api/kuva-ateria) kutsuu aiops-välittäjää Unix-soketissa (aiops ADR-0025/-0027); ilman konfiguroitua
 sokettia reitti vastaa 404. Tavoite-ehdotus (/api/tavoitteet) kutsuu välittäjää samoin tavoin: vapaasta tekstistä
-päivän tavoitearvot, jotka käyttäjä hyväksyy selaimessa (tavoitteet.py).
+päivän tavoitearvot, jotka käyttäjä hyväksyy selaimessa (tavoitteet.py). Väriyhdistelmä (/api/ulkoasu) luetaan Ilmari
+Hubin evästeestä: palvelin vain lukee sen eikä koskaan aseta sitä.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import mimetypes
 import time
 
 from starlette.applications import Starlette
@@ -37,6 +39,8 @@ HUOLTO_VALI_S = 60.0  # huoltosilmukka: varmistus ja viivästynyt vienti
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; "
        "connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; frame-ancestors 'none'; "
        "base-uri 'none'; form-action 'self'")
+VARIT = ("paperi", "liitu", "terminaali", "fosfori")  # Ilmari Hubin väriyhdistelmät; ensimmäinen on oletus
+VARI_EVASTE = "ilmari_vari"  # Hub asettaa evästeen; selain lähettää sen myös porttiin 8443
 loki = logging.getLogger("ravintopolku")
 
 
@@ -75,7 +79,14 @@ def hylkays(request: Request, a: Asetukset) -> tuple[int, str] | None:
     return None
 
 
+def vari(request: Request) -> str:
+    """Hubin väri sallittujen listalta; evästeen merkkijonoa ei koskaan palauteta sellaisenaan."""
+    arvo = request.cookies.get(VARI_EVASTE, "")
+    return arvo if arvo in VARIT else VARIT[0]
+
+
 def luo(a: Asetukset) -> Starlette:
+    mimetypes.add_type("font/woff2", ".woff2")  # Pythonin oma taulu ei tunne woff2:ta; ei riippuvuutta /etc/mime.types:iin
     yhteys = kanta.avaa(a.tietokanta)
     lukko = asyncio.Lock()
     kuvalukko = asyncio.Semaphore(KUVAKUTSUJA_MAX)
@@ -218,6 +229,9 @@ def luo(a: Asetukset) -> Starlette:
             return JSONResponse({"virhe": str(e)}, status_code=e.tila)
         return JSONResponse(tulos)
 
+    async def api_ulkoasu(request: Request) -> Response:
+        return JSONResponse({"vari": vari(request)})
+
     async def api_tuntematon(request: Request) -> Response:
         return JSONResponse({"virhe": "ei rajapintaa"}, status_code=404)
 
@@ -241,6 +255,7 @@ def luo(a: Asetukset) -> Starlette:
         Route("/api/luonnokset/{id:int}", api_luonnos_valmis, methods=["DELETE"]),
         Route("/api/kuva-ateria", api_kuva_ateria, methods=["POST"]),
         Route("/api/tavoitteet", api_tavoitteet, methods=["POST"]),
+        Route("/api/ulkoasu", api_ulkoasu, methods=["GET"]),
         Route("/api/{polku:path}", api_tuntematon, methods=["GET", "POST", "DELETE"]),
         Mount("/", app=StaticFiles(directory=str(a.sovellus), html=True, check_dir=False)),
     ], middleware=[Middleware(BaseHTTPMiddleware, dispatch=vartija)], lifespan=elinkaari)
