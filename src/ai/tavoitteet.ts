@@ -52,8 +52,6 @@ export const ehdotusSchema = z
     fat: rajattu("fat"),
   })
   .strict();
-export type TavoiteArvot = z.infer<typeof ehdotusSchema>;
-
 export const vastausSchema = z
   .object({
     ehdotus: ehdotusSchema,

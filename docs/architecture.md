@@ -8,7 +8,7 @@ UI validoi syötteen, muodostaa aterian ruokalistasta ja välittää sen `saveMe
 
 ## Tietomalli ja versiot
 
-Dexie version 1: profiles, goals, foods, meals, photos, templates, weights, lifestyles, days, settings. Jokaisella tietueella vakaa UUID ja createdAt/updatedAt. Painon, elintapojen ja päivän tilan date-indeksit ovat uniikkeja. Profiileja ja asetuksia on korkeintaan yksi. Tavoitehistoria valitaan effectiveDate-päivän mukaan; sama voimaantulopäivä korvataan profiililomakkeen transaktiossa.
+Dexie version 1: profiles, goals, foods, meals, photos, templates, weights, lifestyles, days, settings. Jokaisella tietueella vakaa UUID ja createdAt/updatedAt. Painon, elintapojen ja päivän tilan date-indeksit ovat uniikkeja. Profiileja ja asetuksia on korkeintaan yksi. Tavoitehistoria valitaan effectiveDate-päivän mukaan; sama voimaantulopäivä korvataan `saveGoal`-transaktiossa.
 
 Ateriarivi säilyttää nimen, valmistustilan, lähteen, syöttötavan, määrän ja ravintoarvot. foodId on viite kirjastoon, **ei laskennan lähde**. Aterialla on lisäksi laskettu snapshot, alkuperä, oletukset, kuva-ID ja muistiinpano. Kokonaisarvon snapshot on null, jos yhdelläkin ainesosalla on kyseinen arvo tuntematon. Alkuperäiset rivit säilyvät, joten tunnettu osasumma ja puuttuvien rivien määrä ovat laskettavissa erikseen. Vakioateria sisältää rivien snapshotit ja määrät; se ei ole suosikkiruoka. Kirjastosta poistaminen ei poista historiatietoa.
 
@@ -16,7 +16,7 @@ Uudessa tietokantaversiossa lisätään Dexie `version(2).stores(...).upgrade(..
 
 ## Päivämäärät
 
-Tarkoitettu paikallinen date säilyy ISO-päivänä ja meal.timestamp UTC-aikaleimana. timezone on Europe/Helsinki. Lomakkeet käyttävät tietovaraston CRUD-funktioita ja `saveProfileGoal`-operaatiota; ne eivät suorita suoria Dexie-kyselyitä. Päivän valinta, summat ja analyysit käyttävät aina date-arvoa. Kalenteripäivien aritmetiikka käyttää UTC:n keskipäivää vain ISO-päivien siirtämiseen; sitä ei käsitellä ateria-ajankohtana.
+Tarkoitettu paikallinen date säilyy ISO-päivänä ja meal.timestamp UTC-aikaleimana. timezone on Europe/Helsinki. Lomakkeet käyttävät tietovaraston CRUD-funktioita (esim. `saveMeal`, `saveGoal`); ne eivät suorita suoria Dexie-kyselyitä. Päivän valinta, summat ja analyysit käyttävät aina date-arvoa. Kalenteripäivien aritmetiikka käyttää UTC:n keskipäivää vain ISO-päivien siirtämiseen; sitä ei käsitellä ateria-ajankohtana.
 
 Kevään kesäaikaan siirtymisen olematon Helsinki-seinäkellonaika hylätään. Syksyn toistuva tunti valitsee ensimmäisen esiintymän. Käyttöliittymä säilyttää intended date/time -arvot. V1 ei tarjoa syksyn toisen 03.xx-tunnin manuaalista valintaa. Raakakirjausta ei siirretä UTC-päivän puolelle.
 
