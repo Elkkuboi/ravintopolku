@@ -1,16 +1,18 @@
 // Tavoitteet luonnollisesta kielestä: vapaa teksti työaseman palvelimelle, joka kutsuu aiops-välittäjää.
 //
-// Elias ei täytä lomakkeita: hän kirjoittaa tavoitteensa sanoin ("painon lievä pudotus") tai valitsee valmiin
-// kuvauksen, ja Ilmari ehdottaa päivän energia- ja makrotavoitteet sekä lyhyen perustelun. Ehdotus näytetään
-// tarkistettavaksi: vasta hyväksytyt luvut tallentuvat päivän tavoitteeksi. Numerot tarkistetaan koodissa täällä ja
-// palvelimella (palvelin/src/ravintopolku_palvelin/tavoitteet.py). Ilman työaseman palvelinta tai välittäjää (404)
-// toiminto ei ole käytössä ja tavoitteet säädetään kuten ennenkin.
+// Elias kirjoittaa tavoitteensa sanoin ("painon lievä pudotus"), ja Ilmari ehdottaa päivän energia- ja makrotavoitteet
+// sekä lyhyen perustelun. Ehdotus näytetään tarkistettavaksi: vasta hyväksytyt luvut tallentuvat päivän tavoitteeksi.
+// Numerot tarkistetaan koodissa täällä ja palvelimella (palvelin/src/ravintopolku_palvelin/tavoitteet.py). Käyttäjä
+// näkee vain lyhyen suomenkielisen virheen; tekninen syy jää palvelimen lokiin. Sama tiedosto muodostaa myös
+// Asetusten tavoitelomakkeen tallentaman tavoitteen (tavoiteLomakkeesta).
 import { z } from "zod";
 import { apiURL } from "./client";
 import {
   type Goal,
   type Nutrients,
   type Profile,
+  PAINO_MAX,
+  PAINO_MIN,
   stamped,
 } from "../domain/model";
 
@@ -22,11 +24,6 @@ export const tavoiteRooliSchema = z.enum([
 export const TAVOITE_ROOLIT = tavoiteRooliSchema.options;
 export type TavoiteRooli = z.infer<typeof tavoiteRooliSchema>;
 export const OLETUSROOLI: TavoiteRooli = "tavoite_ehdottaja";
-export const ROOLIN_NIMI: Record<TavoiteRooli, string> = {
-  tavoite_ehdottaja: "Hubin valinta (tavoite_ehdottaja)",
-  tavoite_ehdottaja_pilvi: "Pilvi (tavoite_ehdottaja_pilvi)",
-  tavoite_ehdottaja_paikallinen: "Paikallinen (tavoite_ehdottaja_paikallinen)",
-};
 
 export const TEKSTI_MIN = 3,
   TEKSTI_MAX = 500,
@@ -44,15 +41,6 @@ export const NIMET: Record<keyof typeof RAJAT, string> = {
   carbs: "Hiilihydraatit (g)",
   fat: "Rasva (g)",
 };
-/** Valmiit kuvaukset samoista tavoitteista — tekstiä saa tietenkin muokata. */
-export const VALMIIT_TAVOITTEET = [
-  "Painon lievä pudotus",
-  "Rasvan muuttaminen lihakseksi",
-  "Painon ylläpito",
-  "Lihasmassan kasvatus",
-  "Vähähiilihydraattinen arki",
-];
-
 const rajattu = (avain: keyof typeof RAJAT) =>
   z.number().finite().min(RAJAT[avain][0]).max(RAJAT[avain][1]).nullable();
 
@@ -77,14 +65,18 @@ export const vastausSchema = z
   .strict();
 export type TavoiteEhdotus = z.infer<typeof vastausSchema>;
 
+/** Tilat, joiden virheteksti tulee palvelimen tavoitteet.py:stä selkokielisenä; muut korvataan yleisellä viestillä. */
+const SELKOKIELISET = new Set([402, 422, 502, 503, 504]);
+export const YLEINEN_VIRHE =
+  "Tavoite-ehdotus epäonnistui. Yritä uudelleen tai kirjoita tavoitteet itse.";
+
 /** Pyytää Ilmarilta tavoite-ehdotuksen palvelimen kautta. Heittää suomenkielisen virheen, jolloin mitään ei tapahdu. */
 export async function ehdotaTavoitteet(
   teksti: string,
   {
-    rooli = OLETUSROOLI,
     profiili = "",
     hae = fetch,
-  }: { rooli?: TavoiteRooli; profiili?: string; hae?: typeof fetch } = {},
+  }: { profiili?: string; hae?: typeof fetch } = {},
 ): Promise<TavoiteEhdotus> {
   const puhdas = teksti.trim().replace(/\s+/g, " ");
   if (puhdas.length < TEKSTI_MIN)
@@ -103,29 +95,29 @@ export async function ehdotaTavoitteet(
       headers: { "Content-Type": "application/json", "X-Ravintopolku": "1" },
       body: JSON.stringify({
         teksti: puhdas,
-        rooli,
+        rooli: OLETUSROOLI,
         profiili: profiili.trim().slice(0, PROFIILI_MAX),
       }),
     });
   } catch {
     throw new Error(
-      "Työaseman palvelimeen ei saada yhteyttä. Tavoitteita ei ehdotettu.",
+      "Palvelimeen ei saada yhteyttä. Yritä myöhemmin uudelleen.",
     );
   }
   const body: unknown = await r.json().catch(() => null);
-  if (r.status === 404 || r.status === 401)
+  if (r.status === 404)
+    throw new Error("Tavoite-ehdotus ei ole käytössä tällä palvelimella.");
+  if (!r.ok) {
+    const virhe =
+      body && typeof body === "object" && "virhe" in body ? body.virhe : null;
     throw new Error(
-      "Tavoite-ehdotus ei ole käytössä tällä palvelimella (vaatii työaseman palvelimen ja aiops-välittäjän).",
+      SELKOKIELISET.has(r.status) && typeof virhe === "string" && virhe
+        ? virhe
+        : YLEINEN_VIRHE,
     );
-  if (!r.ok)
-    throw new Error(
-      body && typeof body === "object" && "virhe" in body
-        ? String(body.virhe)
-        : `Tavoite-ehdotus epäonnistui: palvelin vastasi ${r.status}.`,
-    );
+  }
   const tulos = vastausSchema.safeParse(body);
-  if (!tulos.success)
-    throw new Error("Palvelimen vastaus ei kelpaa. Ehdotusta ei näytetä.");
+  if (!tulos.success) throw new Error("Ehdotus ei kelvannut. Yritä uudelleen.");
   return tulos.data;
 }
 
@@ -215,5 +207,35 @@ export function hyvaksyTavoite(
       fat: arvot.fat,
       fiber: arvot.fiber ?? current?.nutrients.fiber ?? null,
     },
+  };
+}
+
+/**
+ * Asetusten tavoitelomake: energia, makrot, kuitu ja tavoitepaino tämän päivän tavoitteeksi. Tavoitetyyppi ja
+ * tavoitepäivä, joita lomake ei näytä, peritään voimassa olevalta tavoitteelta. Jos tavoitepaino tyhjennetään,
+ * painon pudotus- tai nostotavoite muuttuu pelkäksi seurannaksi (skeema vaatii niiltä painon ja päivän).
+ */
+export function tavoiteLomakkeesta(
+  arvot: Nutrients,
+  tavoitepaino: number | null,
+  pvm: string,
+  nykyinen?: Goal,
+): Goal {
+  if (
+    tavoitepaino !== null &&
+    (tavoitepaino < PAINO_MIN || tavoitepaino > PAINO_MAX)
+  )
+    throw new Error(`Tavoitepainon pitää olla ${PAINO_MIN}–${PAINO_MAX} kg.`);
+  const painotavoite = nykyinen?.kind === "lose" || nykyinen?.kind === "gain";
+  return {
+    ...stamped(),
+    effectiveDate: pvm,
+    kind:
+      painotavoite && tavoitepaino === null
+        ? "track"
+        : (nykyinen?.kind ?? "track"),
+    targetWeight: tavoitepaino,
+    targetDate: tavoitepaino === null ? null : (nykyinen?.targetDate ?? null),
+    nutrients: { ...arvot },
   };
 }
