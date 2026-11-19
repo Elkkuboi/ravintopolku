@@ -12,13 +12,8 @@ function tiedostot(hakemisto: string, paate: RegExp): string[] {
 const ilmanKommentteja = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 const VARI = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(/i;
 
-// Väliaikaiset poikkeukset: vanhat kuvaajat (Kehitys-tekijä poistaa nämä rivit) ja kuvan pienennyksen valkoinen
-// tausta, joka ei ole käyttöliittymän väri.
-const SALLITUT_TSX = new Set([
-  "src/components/Progress.tsx",
-  "src/components/MakroKuvaajat.tsx",
-  "src/data/photos.ts",
-]);
+// Poikkeus: kuvan pienennyksen valkoinen tausta, joka ei ole käyttöliittymän väri.
+const SALLITUT_TSX = new Set(["src/data/photos.ts"]);
 
 describe("tyylitiedostot", () => {
   const css = tiedostot("src", /\.css$/);
