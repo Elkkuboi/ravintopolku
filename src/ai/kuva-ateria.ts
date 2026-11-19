@@ -13,8 +13,6 @@ import {
   type MealLine,
   type Photo,
   kuvaRooliSchema,
-  kuvaLahdeSchema,
-  type KuvaLahde,
   keys,
   emptyNutrients,
   numberInput,
@@ -32,23 +30,6 @@ import { wallTimestamp } from "../domain/dates";
 import { LAHETYS_MAX } from "../data/photos";
 
 export const KUVA_ROOLI = "kuva_tulkki";
-
-// Asetusten vanha lähde- ja roolivalinta (SettingsView) käyttää vielä näitä. Kuvan tulkinta ei käytä niitä; nämä
-// poistetaan, kun valinnat on poistettu Asetuksista.
-export const KUVA_ROOLIT = kuvaRooliSchema.options;
-export type KuvaRooli = z.infer<typeof kuvaRooliSchema>;
-export const OLETUSROOLI: KuvaRooli = KUVA_ROOLI;
-export const ROOLIN_NIMI: Record<KuvaRooli, string> = {
-  kuva_tulkki: "Hubin valinta (kuva_tulkki)",
-  kuva_tulkki_pilvi: "Pilvi (kuva_tulkki_pilvi)",
-  kuva_tulkki_paikallinen: "Paikallinen (kuva_tulkki_paikallinen)",
-};
-export const KUVA_LAHTEET = kuvaLahdeSchema.options;
-export const OLETUSLAHDE: KuvaLahde = "ilmari";
-export const LAHTEEN_NIMI: Record<KuvaLahde, string> = {
-  ilmari: "Ilmari (työaseman palvelin)",
-  api: "Ilmari (työaseman palvelin)",
-};
 
 /** Vapaa lisätieto kuvan mukana: palvelimen VIHJE_MAX on sama raja. */
 export const LISATIEDOT_MAX = 300;

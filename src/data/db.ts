@@ -127,8 +127,6 @@ export const removeWeight = (id: string, database = db) =>
   database.weights.delete(id);
 export const removeFood = (id: string, database = db) =>
   database.foods.delete(id);
-export const removeTemplate = (id: string, database = db) =>
-  database.templates.delete(id);
 export async function saveMeal(
   meal: Meal,
   photo: Photo | null,
@@ -204,11 +202,6 @@ export async function deleteMeal(meal: Meal, database = db) {
           updatedAt: new Date().toISOString(),
         });
     },
-  );
-}
-export async function eraseAll(database = db) {
-  await database.transaction("rw", database.tables, () =>
-    Promise.all(database.tables.map((t) => t.clear())),
   );
 }
 export const defaultMealTime = (date: string) =>

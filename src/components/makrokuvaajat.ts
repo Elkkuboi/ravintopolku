@@ -53,7 +53,7 @@ export function macroCharts(
 }
 export const shortDate = (day: string) =>
   `${Number(day.slice(8))}.${Number(day.slice(5, 7))}.`;
-export const macroDigits = (k: MeterKey) => (k === "energy" ? 0 : 1);
+const macroDigits = (k: MeterKey) => (k === "energy" ? 0 : 1);
 // Spoken version of a chart: the SVG has no readable text for the bars, so the
 // numbers are given as text for screen readers.
 export function macroSummary(c: MacroChart): string {

@@ -10,7 +10,6 @@ label.day-name { position: relative; display: flex; align-items: center; justify
 /* Energia ja makrot */
 .meter + .macros { margin-top: 1.1rem; }
 .figure-of.yli { color: var(--warn); }
-.meter--thin.meter--over > span { background: var(--warn); }
 
 /* Kuvanapit: rivien väli kuten mallissa; label ja button samalle linjalle */
 .capture { row-gap: 1.4rem; }
@@ -19,7 +18,6 @@ label.day-name { position: relative; display: flex; align-items: center; justify
 /* Ateriat, paino, taite */
 button.meal { font: inherit; }
 .inline-field .note { flex-basis: 100%; }
-section.actions > * { margin-top: 0; }
 label.inline.valmis { margin-top: 1.25rem; min-height: 44px; }
 label.inline.suosikki { margin-top: 1rem; min-height: 44px; }
 .label.ruoka-arvot { margin-top: 1.5rem; }
@@ -42,7 +40,7 @@ label.inline.suosikki { margin-top: 1rem; min-height: 44px; }
 .rivi { border-top: 1px dotted var(--rule); padding-top: .8rem; }
 .rivi-paa { display: flex; align-items: flex-end; gap: 1ch; }
 .rivi-paa > .field { flex: 1; min-width: 0; margin-top: 0; }
-.ruuat { margin-top: .8rem; }
+.actions.ruuat { margin-top: .8rem; }
 .hallinta { margin-top: 2rem; border-top: 1px solid var(--rule); padding-top: .4rem; }
 .hallinta .inline-field input { width: auto; text-align: left; }
 .hallinta > * + * { margin-top: .8rem; }

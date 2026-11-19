@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { kaynnistaVari } from "./vari";
 import "./style.css";
-import "./tyylit/vanha.css";
 class ErrorBoundary extends Component<
   { children: ReactNode },
   { error: boolean }

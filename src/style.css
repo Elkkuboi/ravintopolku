@@ -239,6 +239,8 @@ a.meal, button.meal { display: grid; grid-template-columns: 5.5ch 1fr max-conten
 
 /* --- Ravintopolun kuori ja yhteiset osat (App.tsx, components/common.tsx). Näkymien omat tyylit: src/tyylit/. ---- */
 [hidden] { display: none !important; }
+.meter--thin.meter--over > span { background: var(--warn); }   /* rp.css:n järjestys peittäisi ylityksen */
+section.actions > * { margin-top: 0; }                          /* napit samalle riville: ei section-väliä */
 .paivitys { background: var(--sheet); border-bottom: 1px solid var(--rule); }
 .paivitys .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1ch; padding-top: .3rem; padding-bottom: .3rem; }
 .ilmoitukset { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; }
