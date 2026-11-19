@@ -8,6 +8,9 @@ mikä malli roolin takana on (kuva_tulkki), tai käyttäjä pakottaa pilven (kuv
 Mallin vastaus jäsennetään puolustavasti (koodiaidat pois, ensimmäinen JSON-olio) ja muunnetaan AIDraft-luonnokseksi,
 joka tarkistetaan samoilla säännöillä kuin Ilmarin luonnokset (luonnokset.tarkista_luonnos). Tuntematon arvo on null,
 ei nolla. Kuvan sisältöä ei kirjoiteta lokiin.
+
+Käyttäjä näkee lyhyen suomenkielisen viestin. Välittäjän tai tarjoajan tekninen syy (esimerkiksi "tarjoaja vastasi
+HTTP 400: …") menee vain palvelimen lokiin.
 """
 
 from __future__ import annotations
@@ -28,7 +31,10 @@ from .kanta import Hylatty
 
 ROOLIT = ("kuva_tulkki", "kuva_tulkki_pilvi", "kuva_tulkki_paikallinen")
 OLETUSROOLI = "kuva_tulkki"
-KUVA_MAX = 8 * 1024 * 1024
+# Välittäjä hyväksyy enintään 1 MiB:n pyynnön, ja base64 kasvattaa kuvaa kolmanneksella: 700 kt:n kuva, kehote ja
+# 300 merkin vihje mahtuvat rajaan. Sovellus pienentää kuvan tähän rajaan (src/data/photos.ts, LAHETYS_MAX).
+KUVA_MAX = 700_000
+LIIAN_SUURI = "Kuva on liian suuri tulkittavaksi: yli 700 kt."
 KUVA_MIN = 12
 VIHJE_MAX = 300
 RIVEJA_MAX = 30
@@ -111,7 +117,7 @@ def tarkista_pyynto(kentat: dict[str, tuple[bytes, str | None]]) -> tuple[bytes,
         raise Virhe(400, "kuva puuttuu")
     kuva = kentat["kuva"][0]
     if len(kuva) > KUVA_MAX:
-        raise Virhe(413, "kuva on yli 8 MiB")
+        raise Virhe(413, LIIAN_SUURI)
     mime = kuvatyyppi(kuva)
     if mime is None:
         raise Virhe(400, "kuva: vain JPEG, PNG tai WebP")
@@ -205,9 +211,10 @@ def _virheviesti(runko: bytes) -> str:
 
 
 def kutsu(soketti: str, runko: dict, rooli: str, aikaraja: float = AIKARAJA_S, *,
-          toiminto: str = "Kuvantulkinta", neuvo: str = "Valitse Asetuksista toinen kuvantulkinta.",
+          toiminto: str = "Kuvantulkinta", neuvo: str = "Valitse kuvan tulkinnan malli Hubissa tai kirjaa ateria käsin.",
           hidastu: str = "Yritä uudelleen tai kirjaa käsin.", tunniste: str = "kuva-ateria") -> dict:
-    """POST /v1/chat/completions välittäjän Unix-sokettiin. Muu kuin 200 on käyttäjälle näytettävä virhe.
+    """POST /v1/chat/completions välittäjän Unix-sokettiin. Muu kuin 200 on käyttäjälle näytettävä virhe; välittäjän
+    oma virheteksti kirjataan vain lokiin.
 
     Sanat `toiminto`, `neuvo`, `hidastu` ja `tunniste` voi vaihtaa, kun muu ominaisuus (esimerkiksi
     tavoitteet, tavoitteet.py) käyttää samaa kutsua: viestit ja loki puhuvat siitä, mitä käyttäjä yritti.
@@ -233,18 +240,18 @@ def kutsu(soketti: str, runko: dict, rooli: str, aikaraja: float = AIKARAJA_S, *
     kesto = time.monotonic() - alku
     loki.info("%s: rooli=%s tila=%d kesto=%.1fs", tunniste, rooli, tila, kesto)
     if tila != 200:
-        lisa = _virheviesti(sisalto)
-        lisa = f" ({lisa})" if lisa else ""
+        loki.warning("%s: välittäjä vastasi %d (rooli %s): %s", tunniste, tila, rooli,
+                     _virheviesti(sisalto) or "ei syytä")
         if tila == 402:
             raise Virhe(402, "Viikon AI-budjetti on käytetty. Kokeile paikallista mallia tai odota budjetin "
-                             "nollautumista." + lisa)
+                             "nollautumista.")
         if tila == 404:
-            raise Virhe(404, f"Roolille {rooli} ei ole mallia Ilmari Hubissa. {neuvo}" + lisa)
+            raise Virhe(404, f"Roolille {rooli} ei ole mallia Ilmari Hubissa. {neuvo}")
         if tila in (501, 503):
-            raise Virhe(503, f"{toiminto} ei ole juuri nyt käytettävissä välittäjässä." + lisa)
+            raise Virhe(503, f"{toiminto} ei ole juuri nyt käytettävissä välittäjässä.")
         if tila == 502:
-            raise Virhe(502, "Mallin kutsu epäonnistui välittäjässä. Yritä uudelleen." + lisa)
-        raise Virhe(502, f"Välittäjä vastasi {tila}." + lisa)
+            raise Virhe(502, "Mallin kutsu epäonnistui välittäjässä. Yritä uudelleen.")
+        raise Virhe(502, f"Välittäjä vastasi {tila}.")
     if len(sisalto) > VASTAUS_MAX:
         raise Virhe(502, "Välittäjän vastaus oli liian suuri.")
     try:

@@ -196,7 +196,7 @@ def luo(a: Asetukset) -> Starlette:
         async for pala in request.stream():
             runko += pala
             if len(runko) > KUVAPYYNTO_MAX:
-                return JSONResponse({"virhe": "kuva on yli 8 MiB"}, status_code=413)
+                return JSONResponse({"virhe": kuva.LIIAN_SUURI}, status_code=413)
         try:
             kentat = kuva.jasenna_multipart(request.headers.get("content-type", ""), runko)
             data, mime, rooli, pvm, vihje = kuva.tarkista_pyynto(kentat)
