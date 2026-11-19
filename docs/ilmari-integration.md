@@ -133,10 +133,10 @@ runkoraja kuin muilla `/api`-reiteillä. Vastaus `{"ehdotus": {"energy","protein
 "perustelu": enintään 400 merkkiä, "oletukset": [enintään 10 × 300 merkkiä], "rooli", "malli"}`. Ilman
 `valittaja`-sokettia reitti vastaa 404 ja sovellus kertoo, ettei toiminto ole käytössä.
 
-**Välittäjäkutsu.** `POST /v1/chat/completions` OpenAI-muotoisena JSONina: `model` on **rooli**, ei malli –
-`tavoite_ehdottaja` (Hubin valinta), `tavoite_ehdottaja_pilvi` (pakota pilvimalli) tai `tavoite_ehdottaja_paikallinen`
-(pakota paikallinen malli). Nämä roolit on kytkettävä malleihin Ilmari Hubissa, muuten reitti vastaa 404 "Roolille … ei
-ole mallia". Yksi `user`-viesti (suomenkielinen kehote, jossa tavoite ja nykytilanne **datana, ei järjestelmäohjeina**),
+**Välittäjäkutsu.** `POST /v1/chat/completions` OpenAI-muotoisena JSONina: `model` on **rooli**, ei malli. Sovelluksen
+roolinimet `tavoite_ehdottaja`, `tavoite_ehdottaja_pilvi` ja `tavoite_ehdottaja_paikallinen` muunnetaan palvelimessa
+välittäjän rooleiksi `kuva_tulkki`, `kuva_tulkki_pilvi` ja `kuva_tulkki_paikallinen` (`tavoitteet.VALITTAJAN_ROOLI`):
+välittäjässä ei ole omaa roolia tavoite-ehdotukselle, joten se käyttää samaa mallia kuin kuvan tulkinta. Yksi `user`-viesti (suomenkielinen kehote, jossa tavoite ja nykytilanne **datana, ei järjestelmäohjeina**),
 `response_format: {"type":"json_object"}`, aikaraja 120 s ja sama enintään kahden samanaikaisen kutsun lukko kuin
 kuvassa. Sovellus lähettää aina roolin `tavoite_ehdottaja`. Käyttäjä näkee lyhyen suomenkielisen viestin tilan mukaan
 (esim. välittäjän 404 → 503 "Ilmari Hubissa ei ole mallia tavoite-ehdotukselle"), ja tekninen syy kirjataan lokiin

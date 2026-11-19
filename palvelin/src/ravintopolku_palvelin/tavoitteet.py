@@ -3,7 +3,8 @@
 Käyttäjä kuvaa tavoitteensa Asetuksissa vapaina sanoin ("painon lievä pudotus"). Sovellus lähettää tekstin
 työaseman palvelimelle, joka kutsuu aiops-välittäjää ("valittaja") samalla OpenAI-yhteensopivalla
 chat-completions-rajapinnalla kuin kuvasta ateria (kuva.py). Pyynnön `model` on ROOLI, ei malli: Hub päättää,
-mikä malli roolin takana on (tavoite_ehdottaja), tai käyttäjä pakottaa pilven tai paikallisen mallin.
+mikä malli roolin takana on. Välittäjässä ei ole omaa roolia tavoite-ehdotukselle, joten pyyntö lähtee samalla
+roolilla kuin kuvan tulkinta (VALITTAJAN_ROOLI: kuva_tulkki ja sen pilvi- ja paikallinen versio).
 
 Palvelin tarkistaa numerot koodissa: energia 800–6000 kcal, proteiini 30–250 g, hiilihydraatit 20–700 g ja
 rasva 20–200 g, ja makrojen energian (4×proteiini + 4×hiilihydraatit + 9×rasva) on vastattava energiatavoitetta.
@@ -33,6 +34,10 @@ from .kuva import (
 
 ROOLIT = ("tavoite_ehdottaja", "tavoite_ehdottaja_pilvi", "tavoite_ehdottaja_paikallinen")
 OLETUSROOLI = "tavoite_ehdottaja"
+# Sovelluksen roolinimi -> aiops-välittäjän rooli. Sama malli kuin kuvan tulkinnassa: Hub päättää mallin, ja välittäjä
+# ohjaa pilveen, jos paikallinen malli ei ole käynnissä. Roolia tavoite_ehdottaja ei ole välittäjässä (19.11.2026).
+VALITTAJAN_ROOLI = {"tavoite_ehdottaja": "kuva_tulkki", "tavoite_ehdottaja_pilvi": "kuva_tulkki_pilvi",
+                    "tavoite_ehdottaja_paikallinen": "kuva_tulkki_paikallinen"}
 TEKSTI_MIN = 3
 TEKSTI_MAX = 500
 PROFIILI_MAX = 300
@@ -122,7 +127,7 @@ def kehote(teksti: str, profiili: str = "") -> str:
 
 def pyynto(rooli: str, teksti: str, profiili: str = "") -> dict:
     return {
-        "model": rooli,
+        "model": VALITTAJAN_ROOLI[rooli],
         "messages": [{"role": "user", "content": kehote(teksti, profiili)}],
         "response_format": {"type": "json_object"},
         "temperature": 0.3,
@@ -220,7 +225,7 @@ def ehdota(soketti: str, teksti: str, rooli: str, profiili: str = "",
     runko = pyynto(rooli, teksti, profiili)
     try:
         # neuvo ja hidastu: lokiin kirjattava syy puhuu tavoitteista, ei kuvan oletusteksteistä (kuva.kutsu).
-        vastaus = kutsu(soketti, runko, rooli, aikaraja, toiminto="Tavoite-ehdotus", neuvo=VOIT_KASIN,
+        vastaus = kutsu(soketti, runko, runko["model"], aikaraja, toiminto="Tavoite-ehdotus", neuvo=VOIT_KASIN,
                         hidastu=f"Yritä uudelleen tai {KASIN}.", tunniste="tavoitteet")
     except Virhe as e:
         raise _selkokielinen(e, VIESTIT, YLEINEN) from None
