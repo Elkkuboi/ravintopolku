@@ -7,9 +7,18 @@ import {
 } from "../src/domain/model";
 import {
   chartDays,
+  elatiivi,
+  jaksonKeskiarvo,
+  jaksonPituus,
   macroCharts,
   macroSummary,
+  paivaPylvaat,
+  paivaTeksti,
   shortDate,
+  tavoitePaivat,
+  viikkoPylvaat,
+  VIIKOITTAIN_YLI,
+  type MacroPoint,
 } from "../src/components/makrokuvaajat";
 import { line, meal } from "./fixtures";
 const goal = (effectiveDate: string, energy: number | null): Goal => ({
@@ -26,7 +35,7 @@ const goal = (effectiveDate: string, energy: number | null): Goal => ({
     fat: null,
   },
 });
-describe("Kotinäkymän makrokuvaajat", () => {
+describe("Makrosarjat", () => {
   it("näyttää energian, rasvan, hiilihydraatit ja proteiinin oikeilla yksiköillä", () => {
     const charts = macroCharts(emptyDataset(), "2026-10-08");
     expect(charts.map((c) => c.key)).toEqual([
@@ -124,5 +133,148 @@ describe("Kotinäkymän makrokuvaajat", () => {
     expect(text).toContain("2.10. ei tietoa");
     expect(text).toContain("Keskiarvo 300 kcal 1 päivältä");
     expect(text).toContain("Tavoite 950 kcal");
+  });
+});
+
+describe("Kehityksen jakso", () => {
+  it("7, 30 ja 90 päivää ovat kiinteitä; kaikki ulottuu ensimmäiseen kirjaukseen tai punnitukseen", () => {
+    const d = emptyDataset();
+    expect(jaksonPituus(d, "2026-11-19", 30)).toBe(30);
+    expect(jaksonPituus(d, "2026-11-19", "kaikki")).toBe(7);
+    d.meals = [meal("2026-10-01")];
+    expect(jaksonPituus(d, "2026-11-19", "kaikki")).toBe(50);
+    d.weights = [
+      { ...stamped(), date: "2026-09-20", kg: 80, note: "" },
+      // tulevaisuuteen kirjattu ei pidennä jaksoa
+      { ...stamped(), date: "2026-12-01", kg: 80, note: "" },
+    ];
+    expect(jaksonPituus(d, "2026-11-19", "kaikki")).toBe(61);
+  });
+  it("kaikki on vähintään viikko, vaikka kirjauksia olisi vain pari päivää", () => {
+    const d = emptyDataset();
+    d.meals = [meal("2026-11-18")];
+    expect(jaksonPituus(d, "2026-11-19", "kaikki")).toBe(7);
+  });
+  it("akselin päivämäärään tulee vuosi vain, kun se on eri kuin jakson lopussa", () => {
+    expect(paivaTeksti("2026-10-20", "2026-11-19")).toBe("20.10.");
+    expect(paivaTeksti("2025-03-02", "2026-11-19")).toBe("2.3.2025");
+  });
+});
+
+describe("Kehityksen keskiarvo ja tavoitepäivät", () => {
+  const p = (
+    date: string,
+    value: number | null,
+    partial = false,
+  ): MacroPoint => ({
+    date,
+    value,
+    partial,
+  });
+  const end = "2026-11-19";
+  it("keskeneräinen tämä päivä ei laske keskiarvoa, valmiiksi merkitty laskee", () => {
+    const d = emptyDataset();
+    const points = [p("2026-11-17", 2000), p("2026-11-18", 2200), p(end, 400)];
+    expect(jaksonKeskiarvo(d, end, points)).toEqual({ value: 2100, count: 2 });
+    d.days = [{ ...stamped(), date: end, complete: true }];
+    expect(jaksonKeskiarvo(d, end, points).count).toBe(3);
+  });
+  it("osittaiset ja puuttuvat päivät jäävät keskiarvon ulkopuolelle", () => {
+    const points = [
+      p("2026-11-16", 2000),
+      p("2026-11-17", 900, true),
+      p("2026-11-18", null),
+    ];
+    expect(jaksonKeskiarvo(emptyDataset(), end, points)).toEqual({
+      value: 2000,
+      count: 1,
+    });
+  });
+  it("tavoite täyttyy, kun summa on vähintään tavoite; osittainen alaraja riittää, jos se ylittää", () => {
+    const points = [
+      p("2026-11-14", 120),
+      p("2026-11-15", 80),
+      p("2026-11-16", 110, true), // osittainen mutta yli: täyttyi varmasti
+      p("2026-11-17", 60, true), // osittainen ja alle: ei tiedetä
+      p("2026-11-18", null),
+      p(end, 40), // tänään kesken: ei tiedetä
+    ];
+    expect(tavoitePaivat(emptyDataset(), end, points, 100)).toEqual({
+      taytti: 2,
+      paivia: 3,
+    });
+    expect(tavoitePaivat(emptyDataset(), end, [p(end, 105)], 100)).toEqual({
+      taytti: 1,
+      paivia: 1,
+    });
+  });
+  it("lukumäärän elatiivi: 14:stä, 12:sta, 30:stä, 100:sta", () => {
+    expect(
+      [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 20, 30, 41, 90, 100, 110,
+        200, 1000,
+      ].map(elatiivi),
+    ).toEqual([
+      "1:stä",
+      "2:sta",
+      "3:sta",
+      "4:stä",
+      "5:stä",
+      "6:sta",
+      "7:stä",
+      "8:sta",
+      "9:stä",
+      "10:stä",
+      "11:stä",
+      "12:sta",
+      "14:stä",
+      "20:stä",
+      "30:stä",
+      "41:stä",
+      "90:stä",
+      "100:sta",
+      "110:stä",
+      "200:sta",
+      "1000:sta",
+    ]);
+  });
+});
+
+describe("Energian pylväät pitkällä jaksolla", () => {
+  const end = "2026-11-19";
+  it("90 päivään asti pylväs on päivä, sen yli viikon keskiarvo", () => {
+    expect(VIIKOITTAIN_YLI).toBe(90);
+    const d = emptyDataset();
+    d.meals = [meal("2026-11-18")];
+    const [energia] = macroCharts(d, end, 7);
+    expect(paivaPylvaat(energia.points).map((p) => p.nimi)).toEqual([
+      "13.11.",
+      "14.11.",
+      "15.11.",
+      "16.11.",
+      "17.11.",
+      "18.11.",
+      "19.11.",
+    ]);
+  });
+  it("viikot lasketaan jakson lopusta taaksepäin; vanhin viikko voi olla lyhyempi", () => {
+    const [energia] = macroCharts(emptyDataset(), end, 100);
+    const viikot = viikkoPylvaat(emptyDataset(), end, energia.points);
+    expect(viikot).toHaveLength(15);
+    expect(viikot.at(-1)!.nimi).toBe("13.11.–19.11. keskiarvo");
+    // 100 = 14 × 7 + 2: jakso alkaa 12.8., joten vanhimmassa viikossa on kaksi päivää
+    expect(viikot[0].nimi).toBe("12.8.–13.8. keskiarvo");
+    expect(viikot.every((v) => v.value === null && !v.partial)).toBe(true);
+  });
+  it("viikon pylväs on lopullisten päivien keskiarvo: osittainen ja kesken oleva tämä päivä jäävät pois", () => {
+    const d = emptyDataset();
+    const osittainen = meal("2026-11-17");
+    osittainen.lines.push({ ...line(), values: emptyNutrients() });
+    const iso = meal("2026-11-15");
+    iso.lines.push(line()); // 600 kcal
+    d.meals = [iso, meal("2026-11-16"), osittainen, meal(end)];
+    const [energia] = macroCharts(d, end, 14);
+    const viikot = viikkoPylvaat(d, end, energia.points);
+    expect(viikot.map((v) => v.value)).toEqual([null, 450]);
   });
 });

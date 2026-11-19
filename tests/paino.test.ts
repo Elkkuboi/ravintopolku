@@ -5,8 +5,17 @@
 // 4) paino synkronoituu kuten muut kirjaukset.
 import { describe, it, expect, afterEach } from "vitest";
 import { tulkitsePaino } from "../src/domain/paino";
-import { stamped, id, weightSchema, type Weight } from "../src/domain/model";
+import {
+  stamped,
+  id,
+  weightSchema,
+  emptyDataset,
+  emptyNutrients,
+  type Goal,
+  type Weight,
+} from "../src/domain/model";
 import { weightSeries } from "../src/domain/analytics";
+import { painoKuvaaja, tavoiteLahella } from "../src/components/makrokuvaajat";
 import { saveRecord, findWeight, readDataset, DiaryDB } from "../src/data/db";
 import {
   SYNKATTAVAT,
@@ -134,6 +143,67 @@ describe("Kehityksen painosarja", () => {
         (r) => r.weight === null && r.measurements === 0,
       ),
     ).toBe(true);
+  });
+});
+
+describe("Kehityksen painokuvaaja", () => {
+  const tavoite = (kg: number | null): Goal => ({
+    ...stamped(),
+    effectiveDate: "2026-10-01",
+    kind: kg === null ? "track" : "lose",
+    targetWeight: kg,
+    targetDate: kg === null ? null : "2027-03-01",
+    nutrients: emptyNutrients(),
+  });
+  it("pisteet ovat vain mitattuja päiviä; muutos lasketaan ensimmäisestä viimeiseen mittaukseen", () => {
+    const d = emptyDataset();
+    d.weights = [
+      mittaus("2026-10-10", 90), // jakson ulkopuolella
+      mittaus("2026-11-01", 78.4),
+      mittaus("2026-11-05", 78.0),
+      mittaus("2026-11-19", 77.0),
+    ];
+    const k = painoKuvaaja(d, "2026-11-19", 30);
+    expect(k.paivat).toHaveLength(30);
+    expect(k.paivat.at(-1)).toBe("2026-11-19");
+    expect(k.pisteet).toEqual([
+      { i: 11, kg: 78.4 },
+      { i: 15, kg: 78 },
+      { i: 29, kg: 77 },
+    ]);
+    expect(k.pisteet.every((p) => p.kg !== 0)).toBe(true);
+    // suomalainen miinusmerkki ja desimaalipilkku; jakso on mitattu väli
+    expect(k.yhteenveto).toBe("\u22121,4 kg / 18 pv");
+    expect(k.tavoite).toBeNull();
+  });
+  it("nousu saa plusmerkin, yksi mittaus näytetään sellaisenaan, tyhjä jakso ei näytä mitään", () => {
+    const d = emptyDataset();
+    d.weights = [mittaus("2026-11-10", 70.2), mittaus("2026-11-12", 71)];
+    expect(painoKuvaaja(d, "2026-11-19", 30).yhteenveto).toBe("+0,8 kg / 2 pv");
+    d.weights = [mittaus("2026-11-13", 70.2)]; // jakson ensimmäinen päivä
+    expect(painoKuvaaja(d, "2026-11-19", 7).yhteenveto).toBe("70,2 kg");
+    expect(painoKuvaaja(d, "2026-11-19", 7).pisteet).toEqual([
+      { i: 0, kg: 70.2 },
+    ]);
+    d.weights = [];
+    expect(painoKuvaaja(d, "2026-11-19", 7)).toMatchObject({
+      pisteet: [],
+      yhteenveto: null,
+    });
+  });
+  it("tavoitepaino tulee jakson lopussa voimassa olevasta tavoitteesta", () => {
+    const d = emptyDataset();
+    d.goals = [tavoite(76.5)];
+    expect(painoKuvaaja(d, "2026-11-19", 7).tavoite).toBe(76.5);
+    d.goals = [tavoite(null)];
+    expect(painoKuvaaja(d, "2026-11-19", 7).tavoite).toBeNull();
+  });
+  it("tavoiteviiva piirretään vain, kun se on lähellä mittauksia", () => {
+    expect(tavoiteLahella([77, 78.9], 76.5)).toBe(true);
+    expect(tavoiteLahella([84.6, 85], 75)).toBe(false);
+    // pitkällä jaksolla vaihtelu on suuri, joten kaukaisempikin tavoite mahtuu
+    expect(tavoiteLahella([80, 88], 75)).toBe(true);
+    expect(tavoiteLahella([], 75)).toBe(false);
   });
 });
 
