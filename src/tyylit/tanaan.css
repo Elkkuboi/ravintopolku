@@ -16,11 +16,16 @@ section.capture { row-gap: 1.4rem; }   /* style.css tulee nippuun myöhemmin: il
 .capture > * { margin-top: 0; }
 
 /* Ateriat, paino, taite */
-button.meal { font: inherit; }
+button.meal { font: inherit; align-items: normal; }   /* kuten mallin <a>: kello ja kcal nimen ensimmäisellä rivillä */
 .inline-field .note { flex-basis: 100%; }
 label.inline.valmis { margin-top: 1.25rem; min-height: 44px; }
 label.inline.suosikki { margin-top: 1rem; min-height: 44px; }
 .label.ruoka-arvot { margin-top: 1.5rem; }
+
+/* Yhteensä-rivi (luonnos ja MealEditor): pitkä summa siirtyy omalle rivilleen oikeaan reunaan, sana ei katkea */
+.sum { flex-wrap: wrap; gap: 0 1ch; }
+.sum > span:first-child { white-space: nowrap; }
+.sum > span:last-child { margin-left: auto; }
 
 /* Kuvapolku: pikkukuva ja kentät rinnakkain kuten mallissa */
 .draft-head > .thumb { flex: 1; min-width: 0; width: auto; }

@@ -1,7 +1,8 @@
 // Ateria kuvasta: pikkukuva ja valinnainen lisätieto -> Tulkitse kuva -> odotus (Peru) -> tallentamaton luonnos
 // (nimi, kello, rivit ruoka / g / kcal, yhteensä) -> Tallenna tai Hylkää. Virheessä "Yritä uudelleen" lähettää saman
 // kuvan uudelleen ja "Kirjoita käsin" avaa käsin kirjauksen kuva liitettynä. Mitään ei tallenneta ennen Tallenna-napin
-// painamista; sovelluksen sulkeminen kesken hylkää luonnoksen.
+// painamista; sovelluksen sulkeminen kesken hylkää luonnoksen. Toisella sivulla käynti ei hylkää: Tänään pysyy
+// asennettuna piilossa (App.tsx), ja data-keskenerainen estää päivityksen latauksen tulkinnan ja luonnoksen aikana.
 import { Fragment, useEffect, useRef, useState } from "react";
 import { type Meal, type Photo } from "../domain/model";
 import { formatNumber } from "../domain/nutrition";
@@ -21,6 +22,7 @@ import {
 import { BlobImage, Field } from "./common";
 import { KuvaKentta, type KuvaLahde } from "./KuvaKentta";
 import { useFormAction } from "./useFormAction";
+import { TANAAN_ALKUUN } from "../kuori";
 
 type Vaihe = "valittu" | "tulkitaan" | "virhe" | "luonnos";
 interface Luonnos {
@@ -99,6 +101,11 @@ export function KuvaLuonnos({
     )
       onPeru();
   };
+  // Yläpalkin Tänään-linkki toimii kuten tämän sivun oma "Tänään"-linkki.
+  useEffect(() => {
+    window.addEventListener(TANAAN_ALKUUN, hylkaa);
+    return () => window.removeEventListener(TANAAN_ALKUUN, hylkaa);
+  });
   const muuta = (i: number, muutos: Partial<LuonnosRivi>) =>
     luonnos &&
     setLuonnos({
@@ -119,7 +126,12 @@ export function KuvaLuonnos({
       >
         Tänään
       </a>
-      <section aria-label="Ateria kuvasta">
+      <section
+        aria-label="Ateria kuvasta"
+        data-keskenerainen={
+          vaihe === "tulkitaan" || vaihe === "luonnos" ? "" : undefined
+        }
+      >
         <h2 className="label">
           Ateria kuvasta{" "}
           {vaihe === "luonnos" && (

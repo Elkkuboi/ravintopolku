@@ -18,7 +18,7 @@ import {
   tavoiteLahella,
   tavoitePaivat,
   viikkoPylvaat,
-  VIIKOITTAIN_YLI,
+  viikkoPylvaina,
   type Jakso,
   type MacroChart,
   type MacroPoint,
@@ -37,7 +37,7 @@ export default function Kehitys({ data }: NakymaProps) {
     [data, end, paivia],
   );
   const [energia, proteiini] = makrot;
-  const viikoittain = paivia > VIIKOITTAIN_YLI;
+  const viikoittain = viikkoPylvaina(paivia);
   const pylvaat = viikoittain
     ? viikkoPylvaat(data, end, energia.points)
     : paivaPylvaat(energia.points);

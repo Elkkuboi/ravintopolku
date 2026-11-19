@@ -1,6 +1,7 @@
-// Käsin kirjaus ja aterian muokkaus. Näkyvissä vain päivä, kello, ateria, rivit, summa ja muistiinpano; omat ruuat,
-// rivin lähde ja valmistustila, kuva, alkuperä ja oletukset ovat taitteissa. Piilotetut kentät kulkevat muokkauksen
-// läpi muuttumattomina (rivin source ja state, aterian origin, assumptions ja photoId).
+// Käsin kirjaus ja aterian muokkaus. Näkyvissä vain päivä, kello, ateria, rivit, summa ja muistiinpano (kuvasta
+// tulkitulla aterialla "Nimi"); omat ruuat, rivin lähde ja valmistustila, kuva, alkuperä ja oletukset ovat taitteissa.
+// Piilotetut kentät kulkevat muokkauksen läpi muuttumattomina (rivin source ja state, aterian origin ja assumptions);
+// photoId muuttuu vain "Poista kuva" -napista, myös kun kuva on toisella laitteella (tallennettavaKuva).
 import { useState } from "react";
 import {
   type Dataset,
@@ -16,7 +17,7 @@ import { formatNumber, aggregate, lineNutrients } from "../domain/nutrition";
 import { draftOrigin, draftNotes } from "../ai/draft-fields";
 import { ateriatyyppi } from "../ai/kuva-ateria";
 import { type AIDraft } from "../ai/provider";
-import { aterianKopio } from "../nakymat/paiva";
+import { aterianKopio, kuvastaTulkittu } from "../nakymat/paiva";
 import { Field, Decimal, Form, NutrientFields, BlobImage } from "./common";
 import { parseNutrients } from "./form-values";
 import {
@@ -26,6 +27,7 @@ import {
   parseLines,
   epatavallinen,
   rakennaAteria,
+  tallennettavaKuva,
 } from "./ateriamuokkaus";
 import { useFormAction } from "./useFormAction";
 const TYYPIT: Meal["type"][] = [
@@ -142,7 +144,7 @@ export function MealEditor({
                   note,
                   origin,
                   assumptions,
-                  photoId: photo?.id ?? null,
+                  photoId: tallennettavaKuva(meal, photo, removedPhoto),
                 },
                 parsed,
               ),
@@ -313,7 +315,7 @@ export function MealEditor({
             </span>
           </div>
         )}
-        <Field label="Muistiinpano">
+        <Field label={kuvastaTulkittu(origin) ? "Nimi" : "Muistiinpano"}>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}

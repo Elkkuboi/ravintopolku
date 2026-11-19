@@ -175,8 +175,8 @@ export const kuvaRooliSchema = z.enum([
   "kuva_tulkki_pilvi",
   "kuva_tulkki_paikallinen",
 ]);
-// kuvantunnistus: Kuvasta ateria -toiminnon moottori (aiops ADR-0027 vs. OpenAI-API); puuttuva = "ilmari",
-// eli kuva menee työaseman palvelimelle ja sieltä aiops-välittäjälle. "api" käyttää palvelimen API-avainta.
+// kuvantunnistus (ja kuvantulkinta yllä): vanha tallennettu valinta (ilmari/api, rooli). Skeema säilyy datan vuoksi,
+// mutta arvo ohitetaan: kuva lähtee aina roolilla kuva_tulkki (src/ai/kuva-ateria.ts).
 export const kuvaLahdeSchema = z.enum(["ilmari", "api"]);
 export type KuvaLahde = z.infer<typeof kuvaLahdeSchema>;
 export const settingsSchema = z

@@ -39,9 +39,12 @@ Testi tarkistaa:
 
 - kolme sivua aukeavat neljällä värillä ilman CSP-rikkeitä ja konsolivirheitä, ja `theme-color` seuraa väriä
 - käsin kirjaus näkyy päivän summassa ja ateria aukeaa muokattavaksi
-- kamera ja galleria ovat erilliset kentät, ja `capture` on vain kamerassa
+- kamera ja galleria ovat erilliset kentät, `capture` on vain kamerassa ja kohdistuskehys näkyy vain näppäimistöllä
 - kuvapolku: kuva, lisätieto, tulkinta, luonnos ja tallennus (pyyntö alle 700 kt, rooli `kuva_tulkki`)
-- virhepolku: lyhyt suomenkielinen viesti ilman tarjoajan tekstiä, "Yritä uudelleen" ja "Kirjoita käsin"
+- virhepolku: lyhyt suomenkielinen viesti ilman tarjoajan tekstiä ja "Kirjoita käsin"; "Yritä uudelleen" lähettää
+  saman kuvan ja vie luonnokseen; Peru ei tallenna mitään eikä myöhästynyt vastaus avaa luonnosta
+- luonnos säilyy, kun käydään toisella sivulla; yläpalkin Tänään kysyy ennen hylkäämistä
+- Ilmarin luonnosten napeilla on luonnoksen nimi, ja varmuuskopion palautus vaatii sanan KORVAA
 - 360 px:n leveydellä ei vaakavieritystä millään sivulla.
 
 ## Palvelin (pytest)

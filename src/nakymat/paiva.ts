@@ -24,9 +24,12 @@ export function paivanNimi(day: string): string {
 /** Kellonaika suomalaisittain: 08:00 -> 08.00. */
 export const kelloksi = (time: string) => time.replace(":", ".");
 
+/** Kuvasta tulkitun aterian muistiinpano on sen nimi (rivillä ja muokkauksen kentässä "Nimi"). */
+export const kuvastaTulkittu = (origin: string) => origin.startsWith("Kuvasta");
+
 /** Kuvasta tulkitun aterian nimi on sen muistiinpano; muuten rivien nimet. */
 export function aterianOtsikko(meal: Meal): string {
-  if (meal.origin.startsWith("Kuvasta") && meal.note.trim())
+  if (kuvastaTulkittu(meal.origin) && meal.note.trim())
     return meal.note.trim();
   return meal.lines.map((l) => l.name).join(", ");
 }

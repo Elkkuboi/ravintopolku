@@ -17,6 +17,7 @@ import {
   shortDate,
   tavoitePaivat,
   viikkoPylvaat,
+  viikkoPylvaina,
   VIIKOITTAIN_YLI,
   type MacroPoint,
 } from "../src/components/makrokuvaajat";
@@ -242,8 +243,13 @@ describe("Kehityksen keskiarvo ja tavoitepäivät", () => {
 
 describe("Energian pylväät pitkällä jaksolla", () => {
   const end = "2026-11-19";
-  it("90 päivään asti pylväs on päivä, sen yli viikon keskiarvo", () => {
-    expect(VIIKOITTAIN_YLI).toBe(90);
+  it("30 päivään asti pylväs on päivä, 90 päivää ja kaikki yli 30 päivän viikon keskiarvo", () => {
+    expect(VIIKOITTAIN_YLI).toBe(30);
+    expect([7, 30].map(viikkoPylvaina)).toEqual([false, false]);
+    expect([31, 90, 400].map(viikkoPylvaina)).toEqual([true, true, true]);
+    // 90 päivää: 13 pylvästä (12 täyttä viikkoa ja kuuden päivän alku), ei 90 kapeaa päiväpylvästä.
+    const [pitka] = macroCharts(emptyDataset(), end, 90);
+    expect(viikkoPylvaat(emptyDataset(), end, pitka.points)).toHaveLength(13);
     const d = emptyDataset();
     d.meals = [meal("2026-11-18")];
     const [energia] = macroCharts(d, end, 7);

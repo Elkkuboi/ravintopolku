@@ -99,26 +99,39 @@ def test_tyhja_vastaus_ja_kielto(client, valittaja):
 
 # Välittäjän tai tarjoajan englanninkielinen teksti ei koskaan päädy käyttäjälle, vain lokiin.
 @pytest.mark.parametrize("tila,runko,odotettu,viesti", [
-    (402, {"error": {"message": "weekly budget exceeded", "type": "budget"}}, 402, "Viikon AI-budjetti on käytetty"),
+    (402, {"error": {"message": "weekly budget exceeded", "type": "budget"}}, 402,
+     "Viikon AI-budjetti on käytetty. Voit säätää tavoitteet käsin."),
     (404, {"error": {"message": "tuntematon rooli 'tavoite_ehdottaja'", "type": "not_found_error"}}, 503,
-     "Ilmari Hubissa ei ole mallia tavoite-ehdotukselle"),
+     "Ilmari Hubissa ei ole mallia tavoite-ehdotukselle. Voit säätää tavoitteet käsin."),
     (501, {"error": {"message": "json mode not available", "type": "unavailable"}}, 503,
-     "Ilmari ei ole nyt tavoitettavissa"),
+     "Ilmari ei ole nyt tavoitettavissa. Yritä myöhemmin uudelleen tai säädä tavoitteet käsin."),
     (502, {"error": {"message": "tarjoaja vastasi HTTP 400: Unsupported parameter: 'temperature'",
-                     "type": "upstream"}}, 502, "Ehdotus epäonnistui"),
-    (418, b"ei json", 502, "Ehdotus epäonnistui"),
-    (200, b"{ei json", 502, "Ehdotus epäonnistui"),
+                     "type": "upstream"}}, 502, "Ehdotus epäonnistui. Yritä uudelleen tai säädä tavoitteet käsin."),
+    (418, b"ei json", 502, "Ehdotus epäonnistui. Yritä uudelleen tai säädä tavoitteet käsin."),
+    (200, b"{ei json", 502, "Ehdotus epäonnistui. Yritä uudelleen tai säädä tavoitteet käsin."),
 ])
 def test_valittajan_virheet_naytetaan_suomeksi(client, valittaja, caplog, tila, runko, odotettu, viesti):
     valittaja.vastaa(tila, runko)
     with caplog.at_level(logging.WARNING, logger="ravintopolku"):
         r = laheta(client)
     virhe = r.json()["virhe"]
-    assert r.status_code == odotettu and viesti in virhe, r.text
-    assert "säädä tavoitteet käsin" in virhe
+    # Koko viesti: myös kielioppi ("Voit säätää", ei "Voit säädä").
+    assert r.status_code == odotettu and virhe == viesti, r.text
+    assert "Voit säädä" not in virhe
     for tekninen in ("(", "HTTP", "tarjoaja", "rooli", "Välittäjä", "budget", "temperature", "json"):
         assert tekninen not in virhe, virhe
     assert "tavoitteet: virhe " in caplog.text
+    # Lokin rivi puhuu tavoitteista, ei kuvan tulkinnan oletusteksteistä.
+    for kuvan in ("kuvan tulkinnan", "kirjaa ateria", "kirjaa käsin"):
+        assert kuvan not in caplog.text, caplog.text
+
+
+def test_puuttuva_rooli_kirjataan_tavoitteiden_sanoin(client, valittaja, caplog):
+    valittaja.vastaa(404, {"error": {"message": "tuntematon rooli", "type": "not_found_error"}})
+    with caplog.at_level(logging.WARNING, logger="ravintopolku"):
+        laheta(client)
+    assert ("tavoitteet: virhe 404: Roolille tavoite_ehdottaja ei ole mallia Ilmari Hubissa. "
+            "Voit säätää tavoitteet käsin.") in caplog.text
 
 
 def test_tarjoajan_syy_menee_lokiin(client, valittaja, caplog):

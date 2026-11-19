@@ -16,6 +16,26 @@ export interface NakymaProps {
   run: (f: () => Promise<void>) => Promise<void>;
 }
 
+/**
+ * Yläpalkin Tänään-linkkiä napautettiin Tänään-sivulla. Kuvapolku (KuvaLuonnos) kuuntelee tätä ja palaa sivun alkuun
+ * samaa reittiä kuin oma "Tänään"-linkkinsä, eli kysyy ennen kuin hylkää tarkistamattoman luonnoksen.
+ */
+export const TANAAN_ALKUUN = "ravintopolku:tanaan-alkuun";
+
+/**
+ * Päivitys lataa sivun uudelleen. Kesken oleva kuvan tulkinta tai luonnos ([data-keskenerainen], myös piilossa
+ * toisen sivun alla) ja avoin lomake-ikkuna (.modal) hävisivät, joten niistä kerrotaan eikä päivitetä.
+ */
+export function paivitysEste(
+  juuri: Pick<ParentNode, "querySelector">,
+): string | null {
+  if (juuri.querySelector("[data-keskenerainen]"))
+    return "Kuvan luonnos on kesken. Tallenna tai hylkää se ennen päivitystä.";
+  if (juuri.querySelector(".modal"))
+    return "Tallenna tai sulje avoin lomake ennen päivitystä.";
+  return null;
+}
+
 /** Ilmari Hub on saman isännän portissa 443, joten osoitteessa ei ole porttia. */
 export function hubOsoite(isanta: string): string {
   return `https://${isanta}/hub`;

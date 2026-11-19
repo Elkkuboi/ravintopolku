@@ -63,6 +63,17 @@ export const epatavallinen = (lines: MealLine[]) =>
       Object.values(l.values).some((v) => v !== null && v > 3000),
   );
 
+/**
+ * Tallennettava kuvaviittaus. Kuvat eivät synkronoidu, joten toisella laitteella otetun aterian kuvaa ei ole tällä
+ * laitteella: viittaus säilyy, ellei käyttäjä poistanut kuvaa. Muuten se tyhjentyisi ja synkronointi irrottaisi kuvan
+ * myös kuvan ottaneelta laitteelta.
+ */
+export const tallennettavaKuva = (
+  meal: Meal | undefined,
+  kuva: { id: string } | null,
+  poistettu: boolean,
+): string | null => kuva?.id ?? (poistettu ? null : (meal?.photoId ?? null));
+
 export function rakennaAteria(
   meal: Meal | undefined,
   kentat: {

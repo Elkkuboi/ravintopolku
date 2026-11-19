@@ -37,5 +37,5 @@ export async function poistaLuonnos(id: number | string, hae: typeof fetch = fet
     throw new Error("Työaseman palvelimeen ei saada yhteyttä.");
   }
   if (r.status === 404) throw new Error("Luonnosta ei enää ole palvelimen laatikossa.");
-  if (!r.ok) throw new Error(`Kuittaus epäonnistui: palvelin vastasi ${r.status}.`);
+  if (!r.ok) throw new Error("Kuittaus ei onnistunut. Yritä myöhemmin uudelleen.");
 }

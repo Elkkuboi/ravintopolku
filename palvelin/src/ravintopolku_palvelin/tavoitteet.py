@@ -49,9 +49,10 @@ loki = logging.getLogger("ravintopolku")
 # Välittäjäkutsun tila -> (tila, viesti käyttäjälle). Tuntematon tila on YLEINEN. Roolin puuttuminen Hubista (404) on
 # 503, jotta selain ei sekoita sitä reitin puuttumiseen ("ei käytössä tällä palvelimella").
 KASIN = "säädä tavoitteet käsin"
+VOIT_KASIN = "Voit säätää tavoitteet käsin."
 VIESTIT = {
-    402: (402, f"Viikon AI-budjetti on käytetty. Voit {KASIN}."),
-    404: (503, f"Ilmari Hubissa ei ole mallia tavoite-ehdotukselle. Voit {KASIN}."),
+    402: (402, f"Viikon AI-budjetti on käytetty. {VOIT_KASIN}"),
+    404: (503, f"Ilmari Hubissa ei ole mallia tavoite-ehdotukselle. {VOIT_KASIN}"),
     503: (503, f"Ilmari ei ole nyt tavoitettavissa. Yritä myöhemmin uudelleen tai {KASIN}."),
     504: (504, f"Ehdotus kesti liian kauan. Yritä uudelleen tai {KASIN}."),
 }
@@ -218,7 +219,9 @@ def ehdota(soketti: str, teksti: str, rooli: str, profiili: str = "",
     """Koko ketju: teksti -> välittäjä -> mallin JSON -> rajatut tavoitearvot. Mitään ei tallenneta."""
     runko = pyynto(rooli, teksti, profiili)
     try:
-        vastaus = kutsu(soketti, runko, rooli, aikaraja, toiminto="Tavoite-ehdotus", tunniste="tavoitteet")
+        # neuvo ja hidastu: lokiin kirjattava syy puhuu tavoitteista, ei kuvan oletusteksteistä (kuva.kutsu).
+        vastaus = kutsu(soketti, runko, rooli, aikaraja, toiminto="Tavoite-ehdotus", neuvo=VOIT_KASIN,
+                        hidastu=f"Yritä uudelleen tai {KASIN}.", tunniste="tavoitteet")
     except Virhe as e:
         raise _selkokielinen(e, VIESTIT, YLEINEN) from None
     try:

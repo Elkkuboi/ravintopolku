@@ -33,10 +33,13 @@ export function IntegrationInbox({
   useEffect(() => {
     const timer = setTimeout(() => void refresh(), 0);
     const listener = () => void refresh();
+    // Tänään pysyy asennettuna sivun vaihdon yli (App.tsx): laatikko haetaan uudelleen myös sivua vaihdettaessa.
     window.addEventListener("online", listener);
+    window.addEventListener("hashchange", listener);
     return () => {
       clearTimeout(timer);
       window.removeEventListener("online", listener);
+      window.removeEventListener("hashchange", listener);
     };
   }, [refresh, paivitys]);
   if (!items.length) return null;
@@ -66,6 +69,7 @@ export function IntegrationInbox({
                   <button
                     type="button"
                     className="btn--quiet"
+                    aria-label={`Tarkista: ${item.draft.name}`}
                     onClick={() => onOpen(item)}
                   >
                     Tarkista
@@ -74,6 +78,7 @@ export function IntegrationInbox({
                 <button
                   type="button"
                   className="btn--quiet"
+                  aria-label={`${saved ? "Kuittaa" : "Hylkää"}: ${item.draft.name}`}
                   onClick={() => {
                     if (
                       !saved &&

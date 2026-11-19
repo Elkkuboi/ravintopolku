@@ -5,13 +5,15 @@ import { localDay } from "../domain/dates";
 import {
   download,
   exportBackup,
+  palautaVahvistettuna,
+  palautusVahvistettu,
   parseBackup,
-  restoreBackup,
+  PALAUTUS_SANA,
   type Backup,
 } from "../data/backup";
 import { csvExports } from "../data/csv";
 import { synkronoiNyt } from "../data/sync";
-import { Modal } from "./common";
+import { Field, Modal } from "./common";
 import { SyncPanel } from "./SyncPanel";
 import { synkRivi, useSynk } from "./synkronointi";
 import { useFormAction } from "./useFormAction";
@@ -33,7 +35,8 @@ function Tuonti({
   vie: () => void;
   onValmis: () => void;
 }) {
-  const { error, busy, execute } = useFormAction();
+  const { error, busy, execute } = useFormAction(),
+    [vahvistus, setVahvistus] = useState("");
   const d = varmuuskopio.data;
   const viety = new Date(varmuuskopio.exportedAt).toLocaleDateString("fi-FI", {
     timeZone: TIMEZONE,
@@ -47,6 +50,20 @@ function Tuonti({
       <p className="note note--warn">
         Tuonti korvaa nykyiset tiedot myös muilla laitteilla.
       </p>
+      <div className="actions">
+        <button className="btn" type="button" disabled={busy} onClick={vie}>
+          Varmuuskopioi nykyiset ensin
+        </button>
+      </div>
+      <Field label={`Kirjoita ${PALAUTUS_SANA} vahvistaaksesi`}>
+        <input
+          value={vahvistus}
+          onChange={(e) => setVahvistus(e.target.value)}
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+        />
+      </Field>
       {error && (
         <p className="note note--stop" role="alert">
           {error}
@@ -56,18 +73,15 @@ function Tuonti({
         <button
           className="btn btn--stop"
           type="button"
-          disabled={busy}
+          disabled={busy || !palautusVahvistettu(vahvistus)}
           onClick={() =>
             void execute(async () => {
-              await restoreBackup(varmuuskopio);
+              await palautaVahvistettuna(varmuuskopio, vahvistus);
               onValmis();
             })
           }
         >
           {busy ? "Tuodaan…" : "Korvaa tiedot"}
-        </button>
-        <button className="btn" type="button" disabled={busy} onClick={vie}>
-          Varmuuskopioi nykyiset ensin
         </button>
       </div>
     </div>

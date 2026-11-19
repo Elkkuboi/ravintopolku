@@ -9,7 +9,9 @@ import { SYNK_TAPAHTUMA, synkTila, viimeisinTulos } from "./data/sync";
 import { tabs, tabFromHash, type Tab } from "./components/nav";
 import {
   hubOsoite,
+  paivitysEste,
   tallennusRivi,
+  TANAAN_ALKUUN,
   type Ilmoitus,
   type NakymaProps,
 } from "./kuori";
@@ -71,19 +73,23 @@ export default function App() {
     return () => clearTimeout(ajastin);
   }, [ilmoitus]);
   const paivita = () => {
-    // Päivitys lataa sivun uudelleen: avoimen lomakkeen tiedot hävisivät.
-    if (document.querySelector(".modal")) {
-      notify("Tallenna tai sulje avoin lomake ennen päivitystä.");
+    const este = paivitysEste(document);
+    if (este) {
+      notify(este);
       return;
     }
     void updateServiceWorker(true);
+  };
+  // Tänään-linkki Tänään-sivulla ei muuta osoitetta; kuvapolku palaa silloin sivun alkuun (TANAAN_ALKUUN).
+  const tanaanLinkki = () => {
+    if (tab === "today") window.dispatchEvent(new Event(TANAAN_ALKUUN));
   };
   const props: NakymaProps | null = data ? { data, notify, run } : null;
   return (
     <>
       <header className="top">
         <div className="wrap">
-          <a className="brand" href="#">
+          <a className="brand" href="#" onClick={tanaanLinkki}>
             RAVINTOPOLKU
           </a>
           <nav className="nav" aria-label="Sivut">
@@ -92,6 +98,7 @@ export default function App() {
                 key={t.id}
                 href={"#" + t.hash}
                 aria-current={tab === t.id ? "page" : undefined}
+                onClick={t.id === "today" ? tanaanLinkki : undefined}
               >
                 {t.label}
               </a>
@@ -116,21 +123,28 @@ export default function App() {
               Avataan…
             </p>
           ) : (
-            <Suspense
-              fallback={
-                <p className="muted" role="status">
-                  Avataan…
-                </p>
-              }
-            >
-              {tab === "progress" ? (
-                <Kehitys {...props} />
-              ) : tab === "settings" ? (
-                <Asetukset {...props} />
-              ) : (
-                <Tanaan {...props} />
+            <>
+              {tab !== "today" && (
+                <Suspense
+                  fallback={
+                    <p className="muted" role="status">
+                      Avataan…
+                    </p>
+                  }
+                >
+                  {tab === "progress" ? (
+                    <Kehitys {...props} />
+                  ) : (
+                    <Asetukset {...props} />
+                  )}
+                </Suspense>
               )}
-            </Suspense>
+              {/* Tänään pysyy asennettuna piilossa: valittu päivä, kuvan tulkinta ja tallentamaton luonnos tai
+                  lomake säilyvät, kun käydään toisella sivulla. Viimeisenä, jotta näkyvä sivu on ensimmäinen. */}
+              <div className="sivu" hidden={tab !== "today"}>
+                <Tanaan {...props} />
+              </div>
+            </>
           )}
         </div>
       </main>

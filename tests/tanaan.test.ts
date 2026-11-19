@@ -17,8 +17,10 @@ import {
   parseLines,
   epatavallinen,
   rakennaAteria,
+  tallennettavaKuva,
 } from "../src/components/ateriamuokkaus";
 import { IntegrationInbox } from "../src/components/IntegrationInbox";
+import { MealEditor } from "../src/components/MealEditor";
 import {
   mealSchema,
   stamped,
@@ -172,6 +174,66 @@ describe("käsin muokkaus säilyttää piilotetut kentät", () => {
       parseLines([{ ...editLine(freshLine("portion")), grams: "" }])[0].grams,
     ).toBeNull();
     expect(() => parseLines([])).toThrow("vähintään yksi");
+  });
+  it("kuva toisella laitteella: viittaus säilyy tallennuksessa, vain Poista kuva tyhjentää sen", async () => {
+    const vanha = kuvaAteria(); // photoId "kuva-1", kuvaa ei ole tämän laitteen data.photos-listassa
+    expect(tallennettavaKuva(vanha, null, false)).toBe("kuva-1");
+    expect(tallennettavaKuva(vanha, null, true)).toBeNull();
+    expect(tallennettavaKuva(vanha, { id: "kuva-1" }, false)).toBe("kuva-1");
+    expect(tallennettavaKuva(undefined, { id: "uusi" }, false)).toBe("uusi");
+    expect(tallennettavaKuva(undefined, null, false)).toBeNull();
+    // Tallennus ilman muutoksia: kanta säilyttää viittauksen, vaikka kuvaa ei ole tällä laitteella.
+    const db = new DiaryDB("test-" + id());
+    databases.push(db);
+    await saveMeal(vanha, null, false, db);
+    const kentat = {
+      date: vanha.date,
+      time: vanha.time,
+      type: vanha.type,
+      note: vanha.note,
+      origin: vanha.origin,
+      assumptions: vanha.assumptions,
+    };
+    await saveMeal(
+      rakennaAteria(
+        vanha,
+        { ...kentat, photoId: tallennettavaKuva(vanha, null, false) },
+        vanha.lines,
+      ),
+      null,
+      false,
+      db,
+    );
+    expect((await readDataset(db)).meals[0].photoId).toBe("kuva-1");
+    await saveMeal(
+      rakennaAteria(
+        vanha,
+        { ...kentat, photoId: tallennettavaKuva(vanha, null, true) },
+        vanha.lines,
+      ),
+      null,
+      true,
+      db,
+    );
+    expect((await readDataset(db)).meals[0].photoId).toBeNull();
+  });
+  it("kuvasta tulkitun aterian nimi on muokkauksessa kentässä Nimi, muun muistiinpano kentässä Muistiinpano", () => {
+    const piirra = (m: Meal) =>
+      renderToStaticMarkup(
+        createElement(MealEditor, {
+          data: emptyDataset(),
+          date: m.date,
+          meal: m,
+          onSaved: () => {},
+          onDone: () => {},
+        }),
+      );
+    const kuvasta = piirra(kuvaAteria());
+    expect(kuvasta).toMatch(/<label[^>]*>Nimi<\/label><textarea[^>]*>Kanaa, riisiä/);
+    expect(kuvasta).not.toContain(">Muistiinpano<");
+    const kasin = piirra({ ...meal(), note: "Söin kiireessä" });
+    expect(kasin).toMatch(/<label[^>]*>Muistiinpano<\/label><textarea[^>]*>Söin kiireessä/);
+    expect(kasin).not.toContain(">Nimi<");
   });
   it("poikkeuksellisen suuret luvut varmistetaan", () => {
     expect(epatavallinen([line()])).toBe(false);

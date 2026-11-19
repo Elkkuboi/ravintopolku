@@ -1,7 +1,30 @@
 // Kuori: alapalkin Hub-linkki ja tallennusrivi, synkronoinnin viimeisin tulos.
 import { describe, it, expect } from "vitest";
-import { hubOsoite, tallennusRivi } from "../src/kuori";
+import { hubOsoite, paivitysEste, tallennusRivi } from "../src/kuori";
 import { kirjaaTulos, viimeisinTulos } from "../src/data/sync";
+
+describe("paivitysEste", () => {
+  // Pieni dokumentin korvike: querySelector löytää vain annetut valitsimet.
+  const sivu = (...loytyy: string[]) => ({
+    querySelector: (s: string) =>
+      s.split(",").some((osa) => loytyy.includes(osa.trim()))
+        ? ({} as Element)
+        : null,
+  });
+  it("kesken oleva kuvan tulkinta tai luonnos estää päivityksen", () => {
+    expect(paivitysEste(sivu("[data-keskenerainen]"))).toBe(
+      "Kuvan luonnos on kesken. Tallenna tai hylkää se ennen päivitystä.",
+    );
+  });
+  it("avoin lomake-ikkuna estää päivityksen", () => {
+    expect(paivitysEste(sivu(".modal"))).toBe(
+      "Tallenna tai sulje avoin lomake ennen päivitystä.",
+    );
+  });
+  it("ilman keskeneräistä päivitys sallitaan", () => {
+    expect(paivitysEste(sivu())).toBeNull();
+  });
+});
 
 describe("hubOsoite", () => {
   it("on saman isännän /hub ilman porttia", () => {

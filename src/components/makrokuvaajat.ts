@@ -142,8 +142,14 @@ export function tavoitePaivat(
   return { taytti, paivia };
 }
 
-/** Longer periods draw weekly means: a daily bar would be under 4 px wide on a phone and read as noise. */
-export const VIIKOITTAIN_YLI = 90;
+/**
+ * Longer periods draw weekly means. On a 360 px phone a 90-day period would give ~3 px slots and ~2 px bars, which
+ * read as noise and hide the goal line; 30 daily bars still get ~9 px slots.
+ */
+export const VIIKOITTAIN_YLI = 30;
+
+/** True when the period is drawn as weekly means instead of one bar per day. */
+export const viikkoPylvaina = (paivia: number) => paivia > VIIKOITTAIN_YLI;
 
 export interface Pylvas {
   /** Name for the bar's hint text. */
