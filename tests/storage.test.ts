@@ -43,7 +43,7 @@ describe("IndexedDB ja varmuuskopiot", () => {
   it("varmuuskopio palauttaa blob-kuvan, aterian ja null-arvot", async () => {
     const db = database(),
       target = database();
-    const imageBytes = new Uint8Array(readFileSync("public/icon-192.png"));
+    const imageBytes = new Uint8Array(readFileSync("public/icon-192-v2.png"));
     const photo = {
       ...stamped(),
       blob: new Blob([imageBytes], { type: "image/png" }),

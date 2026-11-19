@@ -28,6 +28,8 @@ saa tarvita verkkoa. Asennus ei aja Playwrightia eikä pytestiä: aja ne itse en
 - Asetukset: tavoitelomake, tavoite-ehdotuksen virheet, "Lähetä N poistoa" -nappi ja karsitut osat.
 - Tyylikuri (`tests/tyyli.test.ts`): värit vain neljässä väriyhdistelmässä, ei pyöristyksiä, liukuvärejä eikä varjoja,
   ei inline-tyylejä, ei kuvakekirjastoa, kirjasimet omasta alkuperästä ja esikatselun CSP sama kuin palvelimella.
+- Kuvakkeet (`tests/kuvakkeet.test.ts`): käännöksen manifestin jokainen kuvake on `public/`:ssa PNG-tiedostona,
+  jonka koko on sama kuin manifestissa.
 
 ## Savutesti (Playwright)
 
