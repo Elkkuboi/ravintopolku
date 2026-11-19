@@ -27,14 +27,6 @@ export const dayDistance = (a: string, b: string) =>
 export function dayRange(end: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => addDays(end, i - count + 1));
 }
-export function displayDay(day: string): string {
-  return new Intl.DateTimeFormat("fi-FI", {
-    weekday: "short",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  }).format(new Date(day + "T12:00:00Z"));
-}
 // Search UTC candidates for a Helsinki wall time. DST gaps are rejected; overlaps use the first occurrence.
 export function wallTimestamp(day: string, time: string): string {
   daySchema.parse(day);

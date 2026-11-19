@@ -1,6 +1,7 @@
 import { StrictMode, Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { kaynnistaVari } from "./vari";
 import "./style.css";
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -13,21 +14,24 @@ class ErrorBoundary extends Component<
   render() {
     if (this.state.error)
       return (
-        <main className="card">
-          <h1>Päiväkirjaa ei voitu avata</h1>
-          <p>
-            Tarkista, että selain sallii tämän sivuston paikallisen
-            tallennuksen. Sulje yksityinen selaustila tai kokeile sivun
-            lataamista uudelleen. Älä poista selaintietoja ilman varmuuskopiota.
-          </p>
-          <button className="primary" onClick={() => location.reload()}>
-            Yritä uudelleen
-          </button>
+        <main>
+          <div className="wrap stack">
+            <p className="note note--stop" role="alert">
+              Päiväkirjaa ei voitu avata. Selaimen pitää sallia tämän sivuston
+              tallennus; yksityisessä selaustilassa se ei aina onnistu.
+            </p>
+            <div className="actions">
+              <button className="btn" onClick={() => location.reload()}>
+                Yritä uudelleen
+              </button>
+            </div>
+          </div>
         </main>
       );
     return this.props.children;
   }
 }
+kaynnistaVari();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>

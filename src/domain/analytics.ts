@@ -1,6 +1,6 @@
 import { type Dataset, type Weight } from "./model";
-import { dayRange, addDays, dayDistance } from "./dates";
-import { dayTotals, goalForDay } from "./nutrition";
+import { dayRange, addDays } from "./dates";
+import { dayTotals } from "./nutrition";
 export function weightSeries(weights: Weight[], end: string, count: number) {
   return dayRange(end, count).map((date) => {
     const window = weights.filter(
@@ -17,39 +17,10 @@ export function weightSeries(weights: Weight[], end: string, count: number) {
     };
   });
 }
-export function goalWeight(data: Dataset, date: string): number | null {
-  const p = data.profiles[0],
-    g = goalForDay(data.goals, date);
-  if (
-    !p ||
-    !g?.targetDate ||
-    g.targetWeight === null ||
-    date < p.startDate ||
-    date > g.targetDate
-  )
-    return null;
-  const duration = dayDistance(p.startDate, g.targetDate);
-  if (duration <= 0) return null;
-  return (
-    p.startWeight +
-    ((g.targetWeight - p.startWeight) * dayDistance(p.startDate, date)) /
-      duration
-  );
-}
-export function weeklyChange(
-  startWeight: number,
-  targetWeight: number,
-  startDate: string,
-  targetDate: string,
-): number | null {
-  const days = dayDistance(startDate, targetDate);
-  return days > 0 ? ((targetWeight - startWeight) * 7) / days : null;
-}
 export function dailySeries(
   data: Dataset,
   end: string,
   count: number,
-  completeOnly = false,
 ) {
   return dayRange(end, count).map((date) => {
     const meals = data.meals.filter((m) => m.date === date),
@@ -60,8 +31,8 @@ export function dailySeries(
       complete,
       recorded: meals.length > 0,
       totals,
-      energy: !completeOnly || complete ? totals.energy.value : null,
-      protein: !completeOnly || complete ? totals.protein.value : null,
+      energy: totals.energy.value,
+      protein: totals.protein.value,
       partial: totals.energy.partial,
     };
   });

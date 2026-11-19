@@ -1,0 +1,17 @@
+/* Kehitys-sivu (src/nakymat/Kehitys.tsx). Kuvaajien perusluokat (.chart .grid .axis .line .target .bar .pt) ja jakson
+   valinta (.range) ovat style.css:ssä; tässä vain lisäykset. Ei värejä: kaikki muuttujista. */
+
+/* Jakson valinta painikkeina (risuaita on sivun osoite, joten linkki ei käy). Kosketuskohde 44 px. */
+.range { flex-wrap: wrap; }
+.range button { min-height: 44px; padding: .35rem .7rem; border-color: var(--rule); color: var(--ink-2); font-size: 13px; font-weight: 400; }
+.range button:hover { background: var(--sheet); color: var(--ink); }
+.range button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* Osittainen päiväsumma (alaraja): ontto pylväs. */
+.chart .bar .osittainen { fill: var(--paper); stroke: var(--ink-2); stroke-width: 1; }
+
+/* Päivittäiset luvut: luvut oikealle tasattuina, päivä vasemmalle. */
+.luvut { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.luvut th, .luvut td { text-align: right; padding-right: 1ch; }
+.luvut th:first-child, .luvut td:first-child { text-align: left; }
+.luvut abbr { text-decoration: none; }

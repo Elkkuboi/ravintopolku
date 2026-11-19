@@ -40,6 +40,11 @@ describe("poistaLuonnos", () => {
     await poistaLuonnos("2f1c0a8e-0000-4000-8000-000000000000", hae as unknown as typeof fetch);
     expect(hae).toHaveBeenLastCalledWith("/api/luonnokset/2f1c0a8e-0000-4000-8000-000000000000", expect.anything());
     await expect(poistaLuonnos(3, async () => vastaus({}, 404))).rejects.toThrow("ei enää ole");
-    await expect(poistaLuonnos(3, async () => vastaus({}, 403))).rejects.toThrow("403");
+    // Muu virhe: lyhyt suomenkielinen viesti ilman HTTP-tilakoodia.
+    for (const tila of [403, 500]) {
+      const virhe = await poistaLuonnos(3, async () => vastaus({}, tila)).catch((e: Error) => e);
+      expect((virhe as Error).message).toBe("Kuittaus ei onnistunut. Yritä myöhemmin uudelleen.");
+      expect((virhe as Error).message).not.toContain(String(tila));
+    }
   });
 });

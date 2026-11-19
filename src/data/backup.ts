@@ -182,6 +182,23 @@ export async function restoreBackup(input: Backup, database: DiaryDB = db) {
     }
   });
 }
+
+/** Palautus korvaa kaikki tiedot ja synkronointi vie ne kaikille laitteille: käyttäjä kirjoittaa tämän sanan ensin. */
+export const PALAUTUS_SANA = "KORVAA";
+export const palautusVahvistettu = (teksti: string) =>
+  teksti.trim().toLocaleUpperCase("fi") === PALAUTUS_SANA;
+
+/** restoreBackup vain kirjoitetulla vahvistuksella; ilman sitä heittää eikä koske tietoihin. */
+export async function palautaVahvistettuna(
+  input: Backup,
+  vahvistus: string,
+  database: DiaryDB = db,
+) {
+  if (!palautusVahvistettu(vahvistus))
+    throw new Error(`Kirjoita ${PALAUTUS_SANA} vahvistaaksesi palautuksen.`);
+  await restoreBackup(input, database);
+}
+
 export function download(
   content: Blob | string,
   name: string,

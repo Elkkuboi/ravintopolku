@@ -87,28 +87,6 @@ export async function saveRecord<K extends Exclude<keyof Dataset, "photos">>(
   await database.table(table).put(parsed);
 }
 // These operations keep IndexedDB details out of forms.
-export async function saveProfileGoal(
-  profile: Profile,
-  goal: Goal,
-  database = db,
-) {
-  const p = profileSchema.parse(profile),
-    g = goalSchema.parse(goal);
-  await database.transaction(
-    "rw",
-    database.profiles,
-    database.goals,
-    async () => {
-      await database.profiles.put(p);
-      const existing = await database.goals
-        .where("effectiveDate")
-        .equals(g.effectiveDate)
-        .first();
-      if (existing) await database.goals.delete(existing.id);
-      await database.goals.put(g);
-    },
-  );
-}
 /** Korvaa päivän tavoitteen profiilia koskematta. Ilmarin tavoite-ehdotus hyväksytään tästä. */
 export async function saveGoal(goal: Goal, database = db) {
   const g = goalSchema.parse(goal);
@@ -127,8 +105,6 @@ export const removeWeight = (id: string, database = db) =>
   database.weights.delete(id);
 export const removeFood = (id: string, database = db) =>
   database.foods.delete(id);
-export const removeTemplate = (id: string, database = db) =>
-  database.templates.delete(id);
 export async function saveMeal(
   meal: Meal,
   photo: Photo | null,
@@ -204,11 +180,6 @@ export async function deleteMeal(meal: Meal, database = db) {
           updatedAt: new Date().toISOString(),
         });
     },
-  );
-}
-export async function eraseAll(database = db) {
-  await database.transaction("rw", database.tables, () =>
-    Promise.all(database.tables.map((t) => t.clear())),
   );
 }
 export const defaultMealTime = (date: string) =>

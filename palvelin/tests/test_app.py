@@ -178,3 +178,46 @@ def test_ilman_pudotushakemistoa_laatikko_on_tyhja(polut):
     with TestClient(luo(asetukset(polut)), base_url="http://localhost", client=None) as c:
         assert c.get("/api/luonnokset", headers=OK).json() == {"luonnokset": []}
         assert (polut / "luonnokset" / "20261028-120000-job-9.json").exists()
+
+
+@pytest.mark.parametrize("kuvaus,eväste,odotettu", [
+    ("ei evästettä", None, "paperi"),
+    ("paperi", "ilmari_vari=paperi", "paperi"),
+    ("liitu", "ilmari_vari=liitu", "liitu"),
+    ("terminaali", "ilmari_vari=terminaali", "terminaali"),
+    ("fosfori muiden evästeiden joukossa", "muu=1; ilmari_vari=fosfori; toinen=2", "fosfori"),
+    ("tuntematon arvo", "ilmari_vari=violetti", "paperi"),
+    ("isot kirjaimet", "ilmari_vari=TERMINAALI", "paperi"),
+    ("merkintä", 'ilmari_vari="<x>"', "paperi"),
+    ("tyhjä", "ilmari_vari=", "paperi"),
+])
+def test_ulkoasu_lukee_hubin_varin_sallittujen_listalta(client, kuvaus, eväste, odotettu):
+    otsakkeet = {**OK, "sec-fetch-site": "same-origin", **({"cookie": eväste} if eväste else {})}
+    r = client.get("/api/ulkoasu", headers=otsakkeet)
+    assert r.status_code == 200 and r.json() == {"vari": odotettu}
+    assert r.headers["cache-control"] == "no-store" and r.headers["content-security-policy"] == CSP
+    assert "set-cookie" not in r.headers  # vain Hub asettaa evästeen
+
+
+def test_ulkoasu_vaatii_tunnuksen_ja_oman_alkuperan(client):
+    eväste = {"cookie": "ilmari_vari=fosfori"}
+    assert client.get("/api/ulkoasu", headers={**_ilman("tailscale-user-login"), **eväste}).status_code == 403
+    assert client.get("/api/ulkoasu", headers={**OK, **eväste, "sec-fetch-site": "cross-site"}).status_code == 403
+    assert client.get("/api/ulkoasu", headers={**OK, **eväste, "x-forwarded-host": "paha.example"}).status_code == 421
+    r = client.post("/api/ulkoasu", headers={**POST_OK, **eväste}, content=b"{}")
+    assert r.status_code in (404, 405) and "set-cookie" not in r.headers
+
+
+def test_kirjasin_tarjoillaan_woff2_tyypilla(polut, monkeypatch):
+    """Tyyppi ei saa riippua isännän /etc/mime.types-tiedostosta: Pythonin oma taulu ei tunne woff2:ta."""
+    import mimetypes
+    pelkka_python = mimetypes.MimeTypes(filenames=())
+    pelkka_python.types_map[True].pop(".woff2", None)
+    monkeypatch.setattr(mimetypes, "_db", pelkka_python)
+    assert mimetypes.guess_type("x.woff2")[0] is None
+    (polut / "dist" / "fonts").mkdir()
+    (polut / "dist" / "fonts" / "IBMPlexMono-Regular.woff2").write_bytes(b"wOF2" + b"\0" * 60)
+    with TestClient(luo(asetukset(polut)), base_url="http://localhost", client=None) as c:
+        r = c.get("/fonts/IBMPlexMono-Regular.woff2", headers=OK)
+    assert r.status_code == 200 and r.headers["content-type"] == "font/woff2"
+    assert r.headers["content-security-policy"] == CSP and "font-src 'self'" in CSP

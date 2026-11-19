@@ -8,11 +8,12 @@ import {
   vertaaMakroja,
   ehdotaTavoitteet,
   hyvaksyTavoite,
+  tavoiteLomakkeesta,
   OLETUSROOLI,
   RAJAT,
   TAVOITE_ROOLIT,
   TEKSTI_MAX,
-  VALMIIT_TAVOITTEET,
+  YLEINEN_VIRHE,
 } from "../src/ai/tavoitteet";
 import {
   emptyNutrients,
@@ -87,20 +88,13 @@ describe("ehdotaTavoitteet", () => {
     });
   });
 
-  it("rooli välitetään ja profiili katkaistaan", async () => {
-    const hae = vi.fn(async () =>
-      vastaus({ ...vastausRunko, rooli: "tavoite_ehdottaja_paikallinen" }),
-    );
-    const tulos = await ehdotaTavoitteet(TAVOITE, {
-      rooli: "tavoite_ehdottaja_paikallinen",
-      profiili: "x".repeat(400),
-      hae: f(hae),
-    });
-    expect(tulos.rooli).toBe("tavoite_ehdottaja_paikallinen");
+  it("rooli on aina Hubin valinta ja profiili katkaistaan", async () => {
+    const hae = vi.fn(async () => vastaus(vastausRunko));
+    await ehdotaTavoitteet(TAVOITE, { profiili: "x".repeat(400), hae: f(hae) });
     const runko = JSON.parse(
       String((hae.mock.calls[0] as unknown as [string, RequestInit])[1].body),
     );
-    expect(runko.rooli).toBe("tavoite_ehdottaja_paikallinen");
+    expect(runko.rooli).toBe("tavoite_ehdottaja");
     expect(runko.profiili).toHaveLength(300);
   });
 
@@ -115,28 +109,37 @@ describe("ehdotaTavoitteet", () => {
     expect(hae).not.toHaveBeenCalled();
   });
 
-  it("palvelimen suomenkielinen virhe, 404 ja offline näkyvät sellaisinaan", async () => {
-    await expect(
-      ehdotaTavoitteet(TAVOITE, {
-        hae: async () =>
-          vastaus({ virhe: "Viikon AI-budjetti on käytetty." }, 402),
-      }),
-    ).rejects.toThrow("Viikon AI-budjetti");
-    await expect(
-      ehdotaTavoitteet(TAVOITE, {
-        hae: async () => vastaus({ virhe: "ei rajapintaa" }, 404),
-      }),
-    ).rejects.toThrow("ei ole käytössä tällä palvelimella");
-    await expect(
-      ehdotaTavoitteet(TAVOITE, { hae: async () => vastaus({}, 500) }),
-    ).rejects.toThrow("palvelin vastasi 500");
+  it("palvelimen selkokielinen virhe näytetään, muu korvataan yleisellä viestillä", async () => {
+    const virhe = (status: number, runko: unknown = {}) =>
+      ehdotaTavoitteet(TAVOITE, { hae: async () => vastaus(runko, status) });
+    for (const status of [402, 422, 502, 503, 504])
+      await expect(
+        virhe(status, { virhe: "Viikon AI-budjetti on käytetty." }),
+      ).rejects.toThrow("Viikon AI-budjetti on käytetty.");
+    await expect(virhe(404, { virhe: "ei rajapintaa" })).rejects.toThrow(
+      "Tavoite-ehdotus ei ole käytössä tällä palvelimella.",
+    );
+    // Vartijan ja syötetarkistuksen tekniset tekstit eivät näy käyttäjälle.
+    for (const [status, teksti] of [
+      [400, "rooli: tavoite_ehdottaja, tavoite_ehdottaja_pilvi"],
+      [403, "Tailscale-tunnus puuttuu tai sitä ei ole sallittu"],
+      [413, "pyyntö on yli 1 MiB"],
+      [500, ""],
+    ] as const) {
+      const lupaus = virhe(status, teksti ? { virhe: teksti } : null);
+      await expect(lupaus).rejects.toThrow(YLEINEN_VIRHE);
+    }
+    await expect(virhe(502, null)).rejects.toThrow(YLEINEN_VIRHE);
+    await expect(virhe(502, { virhe: 7 })).rejects.toThrow(YLEINEN_VIRHE);
     await expect(
       ehdotaTavoitteet(TAVOITE, {
         hae: f(async () => {
-          throw new TypeError("Palvelimeen ei saada yhteyttä");
+          throw new TypeError("Failed to fetch");
         }),
       }),
-    ).rejects.toThrow("Tavoitteita ei ehdotettu");
+    ).rejects.toThrow(
+      "Palvelimeen ei saada yhteyttä. Yritä myöhemmin uudelleen.",
+    );
   });
 
   it("kelvoton vastaus hylätään: uhkarooli, äärirajojen ulkopuolinen luku ja ylimääräinen kenttä", async () => {
@@ -155,12 +158,12 @@ describe("ehdotaTavoitteet", () => {
     ])
       await expect(
         ehdotaTavoitteet(TAVOITE, { hae: async () => vastaus(runko) }),
-      ).rejects.toThrow("Ehdotusta ei näytetä");
+      ).rejects.toThrow("Ehdotus ei kelvannut. Yritä uudelleen.");
   });
 });
 
 describe("numerot ja oletukset", () => {
-  it("rajat, roolit ja valmiit tavoitteet ovat samat kuin palvelimella", () => {
+  it("rajat ja roolit ovat samat kuin palvelimella", () => {
     expect(RAJAT).toEqual({
       energy: [800, 6000],
       protein: [30, 250],
@@ -173,14 +176,6 @@ describe("numerot ja oletukset", () => {
       "tavoite_ehdottaja_paikallinen",
     ]);
     expect(OLETUSROOLI).toBe("tavoite_ehdottaja");
-    expect(VALMIIT_TAVOITTEET).toContain("Painon lievä pudotus");
-    expect(VALMIIT_TAVOITTEET).toContain("Rasvan muuttaminen lihakseksi");
-    expect(
-      VALMIIT_TAVOITTEET.every(
-        (teksti) => teksti.length >= 3 && teksti.length <= TEKSTI_MAX,
-      ),
-    ).toBe(true);
-    expect(new Set(VALMIIT_TAVOITTEET).size).toBe(VALMIIT_TAVOITTEET.length);
   });
 
   it("tarkistaRajat hylkää äärirajojen ulkopuoliset luvut, tyhjät kelpaavat", () => {
@@ -325,5 +320,89 @@ describe("hyväksytty ehdotus tallentuu tavoitteeksi", () => {
     };
     await expect(saveGoal(rikkinainen, db)).rejects.toThrow();
     expect((await readDataset(db)).goals).toEqual([]);
+  });
+});
+
+describe("tavoitelomake tallentaa tämän päivän tavoitteen", () => {
+  const laihdutus = {
+    ...stamped(),
+    effectiveDate: "2026-10-01",
+    kind: "lose" as const,
+    targetWeight: 78,
+    targetDate: "2026-12-31",
+    nutrients: { energy: 2400, protein: 150, carbs: 250, fat: 70, fiber: 25 },
+  };
+
+  it("uudet luvut ja tavoitepaino, tyyppi ja tavoitepäivä peritään", () => {
+    const goal = tavoiteLomakkeesta(
+      arvot({ fiber: 30 }),
+      76.5,
+      "2026-11-19",
+      laihdutus,
+    );
+    expect(goalSchema.parse(goal)).toMatchObject({
+      effectiveDate: "2026-11-19",
+      kind: "lose",
+      targetWeight: 76.5,
+      targetDate: "2026-12-31",
+      nutrients: { energy: 2350, protein: 165, carbs: 245, fat: 78, fiber: 30 },
+    });
+    expect(goal.id).not.toBe(laihdutus.id);
+  });
+
+  it("tyhjä tavoitepaino tekee painotavoitteesta seurannan, muu tyyppi säilyy", () => {
+    const seuranta = tavoiteLomakkeesta(arvot(), null, "2026-11-19", laihdutus);
+    expect(goalSchema.parse(seuranta)).toMatchObject({
+      kind: "track",
+      targetWeight: null,
+      targetDate: null,
+    });
+    const yllapito = tavoiteLomakkeesta(arvot(), null, "2026-11-19", {
+      ...laihdutus,
+      kind: "maintain",
+      targetWeight: null,
+      targetDate: null,
+    });
+    expect(yllapito.kind).toBe("maintain");
+  });
+
+  it("ilman aiempaa tavoitetta: seuranta, tavoitepaino ilman päivää kelpaa", () => {
+    const goal = tavoiteLomakkeesta(emptyNutrients(), 80, "2026-11-19");
+    expect(goalSchema.parse(goal)).toMatchObject({
+      kind: "track",
+      targetWeight: 80,
+      targetDate: null,
+      nutrients: emptyNutrients(),
+    });
+  });
+
+  it("mahdoton tavoitepaino hylätään suomeksi", () => {
+    expect(() =>
+      tavoiteLomakkeesta(arvot(), 5, "2026-11-19", laihdutus),
+    ).toThrow("Tavoitepainon pitää olla 10–500 kg.");
+    expect(() => tavoiteLomakkeesta(arvot(), 501, "2026-11-19")).toThrow(
+      "Tavoitepainon pitää olla 10–500 kg.",
+    );
+  });
+
+  it("tallennus korvaa saman päivän tavoitteen eikä koske aiempaan", async () => {
+    const db = new DiaryDB("test-" + id());
+    databases.push(db);
+    await saveRecord("goals", laihdutus, db);
+    await saveGoal(
+      tavoiteLomakkeesta(arvot(), 77, "2026-11-19", laihdutus),
+      db,
+    );
+    await saveGoal(
+      tavoiteLomakkeesta(arvot({ energy: 2200 }), 77, "2026-11-19", laihdutus),
+      db,
+    );
+    const goals = (await readDataset(db)).goals.sort((a, b) =>
+      a.effectiveDate.localeCompare(b.effectiveDate),
+    );
+    expect(goals.map((g) => [g.effectiveDate, g.nutrients.energy])).toEqual([
+      ["2026-10-01", 2400],
+      ["2026-11-19", 2200],
+    ]);
   });
 });

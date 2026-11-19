@@ -1,11 +1,16 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect, afterEach } from "vitest";
 import { DiaryDB, saveMeal, readDataset } from "../src/data/db";
-import { exportBackup, parseBackup, restoreBackup } from "../src/data/backup";
+import {
+  exportBackup,
+  palautaVahvistettuna,
+  palautusVahvistettu,
+  parseBackup,
+  restoreBackup,
+} from "../src/data/backup";
 import { stamped, emptyNutrients, id } from "../src/domain/model";
 import { csvExports } from "../src/data/csv";
 import { meal } from "./fixtures";
-import { parseDraft } from "../src/ai/provider";
 const databases: DiaryDB[] = [];
 const database = () => {
   const d = new DiaryDB("test-" + id());
@@ -52,6 +57,28 @@ describe("IndexedDB ja varmuuskopiot", () => {
     expect(new Uint8Array(await p!.blob.arrayBuffer())).toEqual(imageBytes);
     expect((await target.meals.get(m.id))?.snapshot.fiber).toBeNull();
   });
+  it("palautus korvaa tiedot vain kirjoitetulla vahvistuksella KORVAA", async () => {
+    const lahde = database(),
+      kohde = database();
+    const vanha = meal("2026-11-01"),
+      nykyinen = meal("2026-11-19");
+    await saveMeal(vanha, null, false, lahde);
+    await saveMeal(nykyinen, null, false, kohde);
+    const b = parseBackup(JSON.stringify(await exportBackup(lahde)));
+    for (const v of ["", "korva", "KORVAA TIEDOT", "kyllä"]) {
+      expect(palautusVahvistettu(v)).toBe(false);
+      await expect(palautaVahvistettuna(b, v, kohde)).rejects.toThrow(
+        "Kirjoita KORVAA",
+      );
+    }
+    // Ilman vahvistusta mitään ei korvattu.
+    expect((await kohde.meals.toArray()).map((m) => m.id)).toEqual([
+      nykyinen.id,
+    ]);
+    expect(palautusVahvistettu(" korvaa ")).toBe(true);
+    await palautaVahvistettuna(b, "KORVAA", kohde);
+    expect((await kohde.meals.toArray()).map((m) => m.id)).toEqual([vanha.id]);
+  });
   it("tuntematon versio ja rikkinäinen kuva eivät muuta tietokantaa", async () => {
     const db = database();
     await saveMeal(meal(), null, false, db);
@@ -62,11 +89,6 @@ describe("IndexedDB ja varmuuskopiot", () => {
     b.data.photos = [{ ...stamped(), mime: "image/png", base64: "aGk=" }];
     await expect(restoreBackup(b, db)).rejects.toThrow();
     expect(await db.meals.count()).toBe(1);
-  });
-  it("virheellinen AI-tuonti ei tallennu", async () => {
-    const db = database();
-    expect(() => parseDraft('{"schemaVersion":1,"lines":[]}')).toThrow();
-    expect(await db.meals.count()).toBe(0);
   });
   it("päivän painomittaus on yksilöllinen ja palautus on atominen", async () => {
     const db = database();

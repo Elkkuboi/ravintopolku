@@ -28,8 +28,6 @@ test-results/
 
 .env
 .env.*
-!.env.example
-server-state/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

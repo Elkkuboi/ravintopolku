@@ -8,7 +8,7 @@ import {
   type ReactNode,
   type FormEvent,
 } from "react";
-import { X, AlertCircle } from "lucide-react";
+import { createPortal } from "react-dom";
 import { keys, labels } from "../domain/model";
 import { type NutrientStrings } from "./form-values";
 export function Field({
@@ -62,7 +62,7 @@ export function NutrientFields({
   onChange: (v: NutrientStrings) => void;
 }) {
   return (
-    <div className="nutrient-fields">
+    <div className="fields">
       {keys.map((k) => (
         <Field
           key={k}
@@ -138,7 +138,8 @@ export function Modal({
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [onClose]);
-  return (
+  // Bodyn lapsena: sivun rungon välit ja pinot eivät koske ikkunaa.
+  return createPortal(
     <div className="modal-backdrop">
       <section
         className="modal"
@@ -150,13 +151,14 @@ export function Modal({
       >
         <header>
           <h2>{title}</h2>
-          <button className="icon-button" onClick={onClose} aria-label="Sulje">
-            <X size={22} />
+          <button className="btn--quiet" onClick={onClose}>
+            Sulje
           </button>
         </header>
         {children}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 export function Form({
@@ -176,13 +178,12 @@ export function Form({
     <form onSubmit={onSubmit}>
       {children}
       {error && (
-        <div className="error" role="alert">
-          <AlertCircle size={18} />
-          <span>{error}</span>
-        </div>
+        <p className="note note--stop" role="alert">
+          {error}
+        </p>
       )}
-      <div className="form-footer">
-        <button className="primary" type="submit" disabled={busy}>
+      <div className="actions form-actions">
+        <button className="btn btn--primary" type="submit" disabled={busy}>
           {busy ? "Tallennetaan…" : submit}
         </button>
       </div>

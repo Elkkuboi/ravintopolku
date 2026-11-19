@@ -68,21 +68,17 @@ export function FoodForm({
           maxLength={500}
         />
       </Field>
-      <div className="notice">
-        <strong>Ravintoarvot per 100 g</strong>
-        <p>
-          Annoksen koko annetaan ateriaa kirjatessa. Tyhjä arvo tarkoittaa
-          tuntematonta, nolla tunnettua nollaa.
-        </p>
-      </div>
+      <h3 className="label ruoka-arvot">
+        Arvot per 100 g <span className="aside">tyhjä = ei tiedossa</span>
+      </h3>
       <NutrientFields value={values} onChange={setValues} />
-      <label className="check">
+      <label className="inline suosikki">
         <input
           type="checkbox"
           checked={favorite}
           onChange={(e) => setFavorite(e.target.checked)}
-        />{" "}
-        Lisää suosikkiruokiin
+        />
+        Suosikki
       </label>
     </Form>
   );

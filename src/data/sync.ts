@@ -137,9 +137,19 @@ export async function synkronoi(
   }
 }
 
+// Viimeisin tulos alapalkin tallennusriville: tapahtuma kertoo uudesta tuloksesta, tila luetaan funktiolla.
+export const SYNK_TAPAHTUMA = "ravintopolku-synk";
+let viimeisin: Tulos | null = null;
+export const viimeisinTulos = (): Tulos | null => viimeisin;
+export function kirjaaTulos(tulos: Tulos): Tulos {
+  viimeisin = tulos;
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNK_TAPAHTUMA));
+  return tulos;
+}
+
 // Yksi synkronointi kerrallaan: automaattinen ajo ja "Synkronoi nyt" eivät mene päällekkäin.
 let kesken: Promise<Tulos> | null = null;
 export function synkronoiNyt(sallipoistot = false): Promise<Tulos> {
-  if (!kesken) kesken = synkronoi(oletusDb, fetch, sallipoistot).finally(() => { kesken = null; });
+  if (!kesken) kesken = synkronoi(oletusDb, fetch, sallipoistot).then(kirjaaTulos).finally(() => { kesken = null; });
   return kesken;
 }

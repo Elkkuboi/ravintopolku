@@ -12,6 +12,9 @@ tapauksissa syy kerrotaan oletuksena, samoin kuin mahdollinen makroero. Tuntemat
 
 Vastaus on aina ehdotus: käyttäjä näkee numerot ja perustelun Asetuksissa ja hyväksyy ne vasta tallentaessaan,
 joten mitään ei kirjoiteta kantaan. Tekstiä tai lukuja ei kirjoiteta lokiin.
+
+Virheet: käyttäjä näkee lyhyen suomenkielisen viestin (VIESTIT). Välittäjän tai tarjoajan tekninen syy, esimerkiksi
+"tarjoaja vastasi HTTP 400: …", kirjataan vain lokiin.
 """
 
 from __future__ import annotations
@@ -43,6 +46,19 @@ NIMET = {"energy": "energia (kcal)", "protein": "proteiini (g)", "carbs": "hiili
 KERTOJAT = {"protein": 4, "carbs": 4, "fat": 9}
 ERO_SALLITTU = 0.10  # makrojen energian ja energiatavoitteen suhteutettu ero
 loki = logging.getLogger("ravintopolku")
+# Välittäjäkutsun tila -> (tila, viesti käyttäjälle). Tuntematon tila on YLEINEN. Roolin puuttuminen Hubista (404) on
+# 503, jotta selain ei sekoita sitä reitin puuttumiseen ("ei käytössä tällä palvelimella").
+KASIN = "säädä tavoitteet käsin"
+VOIT_KASIN = "Voit säätää tavoitteet käsin."
+VIESTIT = {
+    402: (402, f"Viikon AI-budjetti on käytetty. {VOIT_KASIN}"),
+    404: (503, f"Ilmari Hubissa ei ole mallia tavoite-ehdotukselle. {VOIT_KASIN}"),
+    503: (503, f"Ilmari ei ole nyt tavoitettavissa. Yritä myöhemmin uudelleen tai {KASIN}."),
+    504: (504, f"Ehdotus kesti liian kauan. Yritä uudelleen tai {KASIN}."),
+}
+YLEINEN = (502, f"Ehdotus epäonnistui. Yritä uudelleen tai {KASIN}.")
+EI_EHDOTUSTA = (422, f"Ilmari ei osannut ehdottaa tavoitteita. Kirjoita tavoite toisin tai {KASIN}.")
+KELVOTON = (502, "Ehdotus ei kelvannut. Yritä uudelleen.")
 
 
 # --- syötteen tarkistus -------------------------------------------------------------------------------------------
@@ -191,20 +207,26 @@ def ehdotukseksi(data: dict, rooli: str, malli: str | None) -> dict:
     }
 
 
+def _selkokielinen(e: Virhe, tilat: dict[int, tuple[int, str]], muu: tuple[int, str]) -> Virhe:
+    """Tekninen syy lokiin, käyttäjälle lyhyt viesti tilan mukaan."""
+    loki.warning("tavoitteet: virhe %d: %s", e.tila, e)
+    tila, viesti = tilat.get(e.tila, muu)
+    return Virhe(tila, viesti)
+
+
 def ehdota(soketti: str, teksti: str, rooli: str, profiili: str = "",
            aikaraja: float = AIKARAJA_S) -> dict:
     """Koko ketju: teksti -> välittäjä -> mallin JSON -> rajatut tavoitearvot. Mitään ei tallenneta."""
     runko = pyynto(rooli, teksti, profiili)
-    vastaus = kutsu(soketti, runko, rooli, aikaraja, toiminto="Tavoite-ehdotus",
-                    neuvo="Voit säätää tavoitteet myös käsin Asetuksissa.",
-                    hidastu="Yritä uudelleen tai säädä tavoitteet käsin.", tunniste="tavoitteet")
+    try:
+        # neuvo ja hidastu: lokiin kirjattava syy puhuu tavoitteista, ei kuvan oletusteksteistä (kuva.kutsu).
+        vastaus = kutsu(soketti, runko, rooli, aikaraja, toiminto="Tavoite-ehdotus", neuvo=VOIT_KASIN,
+                        hidastu=f"Yritä uudelleen tai {KASIN}.", tunniste="tavoitteet")
+    except Virhe as e:
+        raise _selkokielinen(e, VIESTIT, YLEINEN) from None
     try:
         vastauksen_teksti, malli = mallin_teksti(vastaus)
         data = poimi_json(vastauksen_teksti)
     except Virhe as e:
-        if e.tila == 422:
-            raise Virhe(422, "Malli ei ehdottanut tavoitteita. Kirjoita tavoite toisin tai säädä arvot käsin.") from None
-        if e.tila == 502 and "tallennettu" in str(e):
-            raise Virhe(502, "Mallin vastaus ei kelvannut tavoite-ehdotukseksi. Yritä uudelleen.") from None
-        raise
+        raise _selkokielinen(e, {422: EI_EHDOTUSTA}, KELVOTON) from None
     return ehdotukseksi(data, rooli, malli)
