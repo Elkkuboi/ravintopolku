@@ -86,3 +86,22 @@ describe("komponentit", () => {
     expect(readFileSync("package.json", "utf8")).not.toContain("lucide-react");
   });
 });
+
+describe("CSP", () => {
+  // Esikatselu (E2E-savu) ja työaseman palvelin antavat saman otsakkeen, joten savu näkee samat rajat kuin puhelin.
+  const merkkijono = (s: string) =>
+    [...s.matchAll(/"([^"]*)"/g)].map((m) => m[1]).join("");
+  it("vite preview käyttää palvelimen CSP:tä sellaisenaan", () => {
+    const py = readFileSync(
+      "palvelin/src/ravintopolku_palvelin/app.py",
+      "utf8",
+    ).match(/^CSP = \(([\s\S]*?)\)$/m)?.[1];
+    const ts = readFileSync("vite.config.ts", "utf8").match(
+      /const TUOTANNON_CSP =([\s\S]*?);\n/,
+    )?.[1];
+    expect(py && ts).toBeTruthy();
+    expect(merkkijono(ts!)).toBe(merkkijono(py!));
+    expect(merkkijono(py!)).toContain("style-src 'self';");
+    expect(merkkijono(py!)).not.toContain("unsafe");
+  });
+});
