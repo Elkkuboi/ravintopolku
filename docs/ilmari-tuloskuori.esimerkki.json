@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "source": "ilmari-testiesimerkki",
+  "externalId": "esimerkki-1",
+  "dataClass": "public",
+  "draft": {
+    "schemaVersion": 1,
+    "name": "TESTIESIMERKKI: puuro",
+    "lines": [
+      {
+        "name": "Testiruoka",
+        "mode": "per100",
+        "grams": 150,
+        "values": {
+          "energy": 200,
+          "protein": 10,
+          "carbs": null,
+          "fat": null,
+          "fiber": null
+        },
+        "source": "Kiinteä testiarvo, ei kuva-analyysi",
+        "state": "kypsä"
+      }
+    ],
+    "unknowns": ["Hiilihydraatit, rasva ja kuitu"],
+    "assumptions": ["Kiinteä testiesimerkki"],
+    "questions": ["Tarkista todelliset ruuat ja ravintoarvot"],
+    "provenance": {
+      "provider": "ILMARI testiesimerkki",
+      "model": null,
+      "note": "Simulaatio, ei mallin tai kuvan tulkinta"
+    }
+  }
+}

@@ -1,23 +1,14 @@
-# ILMARI / aiops -tulosliitäntä
+# ILMARI ja aiops
 
-Ravintopolku 1.1 tarjoaa **aterialuonnosten vastaanoton**, lähetys-CLI:n, versionoidun JSON-sopimuksen ja käyttäjän tarkistusnäkymän. Se ei ole aiopsin dispatcher, hyväksyjä tai työjonon käyttöliittymä. Vastaanotin toimii paikallisesti testattuna; aiopsin live-kytkentää ei ole tehty.
+Ravintopolku ottaa Ilmarilta vastaan tarkistettavia aterialuonnoksia ja käyttää aiops-välittäjää kahteen asiaan:
+kuvasta ateria ja tavoite-ehdotus. Kaikki kulkee työaseman Python-palvelimen (`palvelin/`) kautta samasta alkuperästä
+(`https://tyoasema.taild1a5b7.ts.net:8443`) Tailscale-tunnistuksella. Ilmari ei kirjoita päiväkirjaan: luonnos tai
+ehdotus päätyy päiväkirjaan vasta käyttäjän tarkistuksen ja tallennuksen jälkeen.
 
-## Lähtötilan rajat
+## Tuloskuori
 
-Käyttäjän toimittama 3.10.2026 tilannekuva kuvaa aiopsin schema 3 / commit d26974e -asennusta: gateway on Unix-soketissa ja Tailscale Serve välittää siihen, gatewaylla ja dispatcherilla ei ole verkkoa eikä AI-agenttia ole vielä kytketty. Tässä työtilassa aiops-repoa ei ole. GitHubin lukuyritys palautti HTTP 401, joten sen reittejä, job-skeemaa ja ADR-ohjeita ei voitu tarkistaa lähdekoodista. Tilannekuvaa ei ole varmennettu livenä.
-
-Ravintopolku ei muuta nykyisiä palveluita, tietokantoja, passkey-reittejä, hyväksyjäavaimia, Dockeria tai Tailscale Serveä. Erityisesti **ILMARI_INTEGRATION_TOKEN ei ole aiopsin hyväksyjäavain**. Se ei oikeuta töiden hyväksyntään, ajoon tai Ravintopolun päiväkirjan lukemiseen. Gatewayn ja dispatcherin verkko-oikeuksia ei muuteta tämän integraation vuoksi.
-
-## Sopimus
-
-- [OpenAPI 3.1](ilmari.openapi.json): palvelun suhteellinen juuri `/api/integrations/v1` (alihakemistossa lisää sovelluksen peruspolku).
-- [Tuloskuoren JSON-skeema](../integrations/ilmari/result.schema.json).
-- [Aterialuonnoksen skeema](ai-draft.schema.json).
-- [Selvästi merkitty testiesimerkki](../integrations/ilmari/example-result.json).
-
-`GET /api/integrations/v1/schema` palauttaa luonnoksen skeeman ja kyvykkyydet. `POST /api/integrations/v1/drafts` vastaanottaa yhden tuloskuoren. Molemmat vaativat `Authorization: Bearer <ILMARI_INTEGRATION_TOKEN>`. Salaisuus ei kuulu URL:iin, JSON-runkoon, komentorivin argumenttiin tai mallin promptiin.
-
-Tuloskuori:
+Skeemat: [tuloskuori](ilmari-tuloskuori.schema.json), [aterialuonnos](ai-draft.schema.json) (versio 1, `npm run
+schema`) ja [testiesimerkki](ilmari-tuloskuori.esimerkki.json).
 
 ```json
 {
@@ -29,43 +20,14 @@ Tuloskuori:
 }
 ```
 
-Yllä oleva draft on havainnollistus, ei validoitu lähetettävä esimerkki. Käytä linkitettyä kokonaisesimerkkiä. `source` on 1–64 merkkiä (ASCII-kirjaimet/numerot ja `_-`); `externalId` 1–128 merkkiä (ASCII-kirjaimet/numerot ja `._:-`). `dataClass`: public/private/restricted. **restricted hylätään sekä CLI:ssä ennen siirtoa että vastaanottimessa (403)**. Tulosvälittäjän pitää johtaa dataluokka aiopsin todennetusta työstä ja politiikasta, ei mallin tekstistä; JSONin dataClass ei yksin todista luokitusta. Yksityistä dataa ei saa lähettää frontier-APIin tämän kautta: tulosliitäntä vastaanottaa jo muodostetun luonnoksen, ei käynnistä OpenAI-kutsua. Ravintopolun OpenAI-toiminnon lähetys on erillinen käyttäjän suostumukseen perustuva syöte, ei aiopsin private-datahakemiston vienti.
-
-Sama `source + externalId` ja sama sisältö palauttaa 200 sekä saman id:n (state on pending_review tai käsitellylle already_reviewed); ensimmäinen vastaanotto palauttaa 201. Sama tunniste eri sisällöllä palauttaa 409. Uudessa korjatussa tuloksessa käytä uutta externalId:tä. Deduplicointi toimii seitsemän päivän säilytysajan sisällä. Vastaanotossa tietokantaan tallentuu **pending_review-luonnos**, ei ateria.
-
-Luonnos avataan sovelluksen Asetuksista, käyttäjä täydentää massat/tiedot ja hyväksyy aterian. Vasta silloin selain kirjoittaa IndexedDB:hen. Kuittaus poistaa palvelinlaatikon sisällön; tunniste ja tiiviste säilyvät alkuperäiseen seitsemän päivän määräaikaan asti. Jos kuittaus epäonnistuu, paikallisen aterian luonnos-ID estää tahattoman uudelleenavauksen samassa päiväkirjassa. Tämä ei lupaa exactly-once-kirjausta useaan laitteeseen: päiväkirja on laitekohtainen. Integraatio ei kuljeta kuvia; käyttäjä voi lisätä kuvan aterialomakkeessa erikseen.
-
-Virheet: 401 väärä avain, 403 data/Origin-kielto, 409 tunnisteristiriita, 413 liian suuri pyyntö, 422 virheellinen skeema, 429 raja. Laatikko enintään 100 odottavaa luonnosta, vastaanotto 20/min, HTTP-runko enintään 3 MiB. Sovelluksen koko päiväkirja, avaimet ja hyväksynnät eivät kuulu tuloskuoreen. Virhe ei muuta päiväkirjaa.
-
-## Paikallinen lähetys-CLI
-
-Palvelimen `npm run setup` luo erillisen integraatioavaimen `.env`:iin. Tyhjä ILMARI_INTEGRATION_TOKEN poistaa tulosrajapinnan käytöstä. Palvelun käynnistys lukee arvon; avaimen vaihdon jälkeen käynnistä palvelin uudelleen.
-
-Lähettävän prosessin ympäristössä tarvitaan:
-
-```dotenv
-RAVINTOPOLKU_URL=http://localhost:3001/
-RAVINTOPOLKU_INTEGRATION_TOKEN=sama_rajattu_token_kuin_palvelimella
-```
-
-Etä-URL tarvitsee HTTPS:n; HTTP sallitaan vain loopbackiin. Perus-URL päättyy `/`:iin. Säilytä arvot esimerkiksi erillisessä 0600-tiedostossa **repon ulkopuolella**, jonka oikeutettu välitysprosessi lukee. Älä kopioi OpenAI-avainta ILMARIlle.
-
-```bash
-# Esimerkki prosessille, joka saa lukea tämän oman rajatun ympäristötiedoston:
-node --env-file=/oma/yksityinen/ravintopolku-bridge.env --import tsx \
-  integrations/ilmari/bridge.ts submit /oma/validoitu-tulos.json
-
-# Pelkän AIDraft-skeeman vienti ilman verkkoa (ei korvaa tiedostoa):
-npm run ilmari -- schema /tmp/ravintopolku-draft.schema.json
-```
-
-CLI validoi tiedoston ennen HTTP-kutsua, ei lue aiops-kantaa/avaimia eikä käynnistä kontteja. Se tulostaa vain vastaanoton tunnisteen ja tilan. Virheestä ei tulosteta syötettä tai tokenia. Tarkka tiedostopolkujen ja tuloslähteen valinta kuuluu myöhempään aiops-adapteriin.
+`source` on 1–64 merkkiä (ASCII-kirjaimet/numerot ja `_-`); `externalId` 1–128 merkkiä (ASCII-kirjaimet/numerot ja
+`._:-`). `dataClass`: public/private/restricted; **restricted hylätään aina**. Dataluokka pitää johtaa aiopsin
+todennetusta työstä ja politiikasta, ei mallin tekstistä. Integraatio ei kuljeta kuvia.
 
 ## Tiedostopudotus palvelimelle (aiops ADR-0026)
 
-Työasemalla (`https://tyoasema.taild1a5b7.ts.net:8443`) Node-palvelinta ei ole, joten yllä kuvattu HTTP-vastaanotto ei ole
-käytössä. Sen sijaan Ilmari (aiops-gatewayn `aiops-gw`-käyttäjänä ajettava palvelu) **pudottaa tuloskuoren tiedostona**
-hakemistoon, jonka Ravintopolun Python-palvelin (`palvelin/`) lukee ja tarjoilee sovelluksen ILMARIn luonnoslaatikkoon.
+Ilmari (aiops-gatewayn `aiops-gw`-käyttäjänä ajettava palvelu) **pudottaa tuloskuoren tiedostona** hakemistoon, jonka
+Ravintopolun Python-palvelin (`palvelin/`) lukee ja tarjoilee sovellukselle.
 Tiedostopudotuksessa ei ole tokenia eikä verkkoa: oikeudet ovat hakemiston käyttöoikeuksia, ja laatikko näkyy vain
 Tailscale-tunnistetulle käyttäjälle samasta alkuperästä. Ilmari ei edelleenkään kirjoita päiväkirjaan: luonnos päätyy
 ateriaksi vasta käyttäjän tarkistuksen ja tallennuksen jälkeen.
@@ -89,7 +51,7 @@ ja sitten `rename`. Palvelin käsittelee vain nimimallin mukaiset tiedostot; muu
 
 **Käsittely.** Palvelin lukee hakemiston huoltosilmukassa (60 s välein) ja heti, kun sovellus hakee laatikon
 (`GET /api/luonnokset`). Tiedosto avataan seuraamatta symbolisia linkkejä, ja vain tavallinen tiedosto kelpaa. Kuori
-tarkistetaan samoin säännöin kuin HTTP-vastaanotossa; `restricted` hylätään aina. Kelvollinen luonnos tallentuu palvelimen
+tarkistetaan yllä kuvatuin säännöin; `restricted` hylätään aina. Kelvollinen luonnos tallentuu palvelimen
 SQLite-kantaan odottavaksi (`luonnokset`-taulu) ja tiedosto poistetaan. **Kelvoton tiedosto siirretään alihakemistoon
 `hylatyt/`** ja syy kirjoitetaan viereen tiedostoon `<nimi>.syy.txt`; mitään ei poisteta hiljaa. Sama `source + externalId`
 otetaan vastaan vain kerran: toistotiedosto poistetaan ilman uutta luonnosta myös silloin, kun aiempi on jo käsitelty.
@@ -99,20 +61,26 @@ poistetaan kannasta; tunniste säilyy toistojen torjuntaan.
 
 **Rajapinta sovellukselle** (sama Tailscale-tunnistus ja saman alkuperän säännöt kuin muilla `/api`-reiteillä):
 `GET /api/luonnokset` → `{"luonnokset":[{"id","externalId","source","saapunut","draft"}]}` (vain odottavat, uusin ensin);
-`DELETE /api/luonnokset/{id}` merkitsee luonnoksen käsitellyksi (404, jos sitä ei ole odottamassa). Sovellus avaa luonnoksen
-Asetuksista aterialomakkeeseen, ja tallennuksen jälkeen se kuittaa luonnoksen; ateriaan jää oletusrivi `ILMARI-luonnos: <id>`.
+`DELETE /api/luonnokset/{id}` merkitsee luonnoksen käsitellyksi (404, jos sitä ei ole odottamassa). Odottavat luonnokset
+näkyvät Tänään-sivulla (osio näkyy vain, kun luonnoksia on). Luonnos avautuu aterialomakkeeseen, ja tallennuksen
+jälkeen sovellus kuittaa sen; ateriaan jää oletusrivi `ILMARI-luonnos: <id>`.
 Kuittaus on best effort: yhteysvirhe ei peru jo tallennettua ateriaa, ja luonnoksen voi merkitä käsitellyksi myöhemmin.
 
 ## Kuvasta ateria (aiops ADR-0027)
 
-Ateria syntyy **pelkästä kuvasta** ilman pakollisia kenttiä: kotinäkymän **Kuvaa ateria** -painike antaa ottaa kuvan
-kameralla tai valita sen galleriasta, lähettää kuvan valitulle lähteelle — paikallinen Ilmari työaseman palvelimen
-kautta tai palvelimen API-avain — ja tallentaa palautetun luonnoksen heti valitun päivän ateriaksi. Lukujen täyttö ei
-kuulu käyttäjälle: kuvan mukana saa kirjoittaa vapaat lisätiedot (`vihje`, enintään 300 merkkiä), jotka menevät
-tulkitsijalle datana kummassakin lähteessä ja jäävät ateriaan näkyviin tarkistusta varten. Kuva voi olla ruoka-annos
-tai pakkauksen takaetiketti (ravintosisältö per 100 g ja pakkauksen paino). Ateriaan jää alkuperä `Kuvasta (rooli X)`
-tai `Kuvasta (API-avain: malli)` ja mallin oletukset, puuttuvat tiedot ja kysymykset; ilmoituksen **Avaa** avaa aterian
-muokattavaksi. Pienennetty kuva tallentuu laitteelle kuten muissakin aterioissa (ei synkronoidu).
+Tänään-sivun **Ota kuva** avaa takakameran (`capture="environment"`) ja **Galleriasta** kuvavalitsimen. Kuva
+pienennetään heti puhelimessa JPEGiksi (pidempi sivu 1600 px, laatu 0,8 → 0,7 → 0,6, tarvittaessa 1280 px) enintään
+700 000 tavuun; raakaa tiedostoa ei lähetetä koskaan, ja pienennyksen virhe näytetään. Kuvan mukana saa kirjoittaa
+valinnaisen lisätiedon (`vihje`, enintään 300 merkkiä), joka menee tulkitsijalle datana ja jää ateriaan näkyviin.
+**Tulkitse kuva** lähettää kuvan; odotuksen voi perua. Tulos on **tallentamaton luonnos** (nimi, kello, rivit ruoka /
+g / kcal, yhteensä), jonka käyttäjä tallentaa tai hylkää. Mitään ei tallenneta ennen Tallenna-napautusta. Ateriaan jää
+alkuperä `Kuvasta (malli): ruoka-annos` tai `…: tuoteseloste`, ja mallin oletukset ja kysymykset ovat taitteessa.
+Pienennetty kuva tallentuu laitteelle kuten muissakin aterioissa (ei synkronoidu).
+
+Virheessä käyttäjä näkee yhden lyhyen suomenkielisen rivin, joka valitaan HTTP-tilan mukaan
+(`src/ai/kuva-ateria.ts`, `kuvaVirhe`): palvelimen tai välittäjän tekstiä ei näytetä. Tekninen syy kirjataan
+palvelimen lokiin. **Yritä uudelleen** lähettää saman kuvan (uusi kutsu), **Kirjoita käsin** avaa käsin kirjauksen
+kuva liitettynä.
 
 **Reitti.** Palvelin (`palvelin/`, ADR-0025) kutsuu aiops-välittäjää ("valittaja") Unix-soketissa, joka konfiguroidaan
 riville `valittaja = "/run/aiops-valittaja/valittaja.sock"` (`/etc/ravintopolku/palvelin.toml`; malli
@@ -122,13 +90,13 @@ mallivalintaa: välittäjä hoitaa budjetin, politiikan ja mallin. Soketin pitä
 yhdistettävissä (välittäjän oma asennus, aiops-repon isäntämuutos).
 
 **Välittäjäkutsu.** `POST /v1/chat/completions` OpenAI-muotoisena JSONina: `model` on **rooli**, ei malli –
-`kuva_tulkki` (Hubin valinta: Hub päättää roolin takana olevan mallin), `kuva_tulkki_pilvi` (pakota pilvimalli) tai
-`kuva_tulkki_paikallinen` (pakota paikallinen malli). Yksi `user`-viesti, jossa tekstiosa (suomenkielinen kehote) ja
+sovellus lähettää aina `kuva_tulkki` (Hub päättää roolin takana olevan mallin); palvelin hyväksyy myös
+`kuva_tulkki_pilvi` ja `kuva_tulkki_paikallinen`. Yksi `user`-viesti, jossa tekstiosa (suomenkielinen kehote) ja
 kuvaosa `{"type":"image_url","image_url":{"url":"data:image/jpeg;base64,…"}}`, sekä `response_format:
 {"type":"json_object"}`. Aikaraja 120 s, enintään kaksi samanaikaista kutsua. Vastaus on chat-completions-JSON
 (`choices[0].message.content`) tai virheolio `{"error":{"message","type"}}`: 402 viikkobudjetti ylittynyt, 404 roolille
-ei mallia, 501/503 ei käytettävissä, 502 malli epäonnistui. Jokainen muu kuin 200 näytetään käyttäjälle
-suomenkielisenä viestinä (välittäjän oma viesti lyhennettynä perässä), eikä mitään tallenneta.
+ei mallia, 501/503 ei käytettävissä, 502 malli epäonnistui. Välittäjän oma teksti kirjataan palvelimen lokiin
+(warning), eikä mitään tallenneta.
 
 **Mallin sopimus.** Malli palauttaa vain JSON-olion `{"name", "kind": "ateria"|"tuoteseloste", "lines": [{"name",
 "mode": "per100"|"portion", "grams": luku|null, "values": {"energy","protein","carbs","fat","fiber"} luku|null}],
@@ -142,52 +110,37 @@ Rivi ilman yhtäkään arvoa hylätään; jos rivejä ei jää, vastaus on 422.
 
 **Rajapinta sovellukselle.** `POST /api/kuva-ateria`, `multipart/form-data` (sama Tailscale-tunnistus ja
 Origin-sääntö kuin muilla `/api`-reiteillä): kenttä `kuva` (JPEG/PNG/WebP taikatavuista tunnistettuna, enintään
-8 MiB), valinnaiset `rooli` (oletus `kuva_tulkki`), `pvm` (VVVV-KK-PP, palautetaan sellaisenaan) ja `vihje` (enintään
+700 000 tavua, sama raja kuin sovelluksessa), valinnaiset `rooli` (oletus `kuva_tulkki`), `pvm` (VVVV-KK-PP, palautetaan sellaisenaan) ja `vihje` (enintään
 300 merkkiä, liitetään kehotteeseen datana; kehote käskee mallia ottamaan sen huomioon nimissä, grammoina ja arvioissa).
 Vastaus `{"draft": AIDraft (schemaVersion 1), "kind", "rooli", "pvm"}`;
 `draft.provenance.provider` on `aiops-välittäjä / <rooli>` ja `model` välittäjän ilmoittama malli. Virheet: 400 kelvoton
 kenttä tai kuva, 404 toiminto ei käytössä, 413 liian suuri, 415 väärä sisältötyyppi, 422 kuvasta ei saatu ateriaa,
 402/502/503/504 välittäjästä. Lokiin kirjataan rooli, tila ja kesto – ei kuvaa eikä mallin tekstiä.
 
-**Lähteen valinta.** Asetukset → Kuvatunnistuksen lähde: **Paikallinen Ilmari** (oletus) on edellä kuvattu reitti –
-kuva menee työaseman palvelimelle ja sieltä aiops-välittäjälle, eikä API-avainta tarvita. **API-avain** käyttää
-Node-palvelimen (`server/`) olemassa olevaa `/api/ai/draft`-reittiä: selain lähettää kuvan base64:nä JSONissa
-(enintään 2 Mt, kirjautuminen palvelusalasanalla, `consent: true`, tyhjä teksti riittää) ja palvelin kutsuu OpenAIta
-palvelimella olevalla avaimellaan; avain ei ole selaimessa. API vastaa AIDraft-luonnoksella, joten laji pitää päätellä:
-`per100`-rivi tulkitaan tuoteselosteeksi, muuten ateriaksi. Alkuperä ja oletukset kertovat avaimen ja mallin
-(`draft.provenance.model`), eivät rooli. Molemmat lähteet tallentavat aterian samalla `saveMeal`-polulla, ja virheet
-(avain puuttuu 503, päiväkatto 429, ei yhteyttä) näkyvät suomenkielisinä eivätkä muuta päiväkirjaa. Valinta tallentuu
-`settings`-tauluun (`kuvantunnistus`, puuttuva = `ilmari`) ja synkronoituu laitteiden välillä.
-
-**Roolin valinta.** Asetukset → Kuvantulkinta: Hubin valinta, Pilvi tai Paikallinen. Valinta tallentuu päiväkirjan
-`settings`-tauluun (`kuvantulkinta`, puuttuva = `kuva_tulkki`) ja synkronoituu laitteiden välillä; sama vaihto on
-Ilmari Hubissa. Roli koskee vain Ilmari-lähdettä: Node-palvelimella (`server/`) ei ole `/api/kuva-ateria`-reittiä,
-ja API-avaimen reitti valitsee mallin palvelimen asetuksesta (`OPENAI_MODEL`).
+Asetusten vanhat kentät `kuvantunnistus` ja `kuvantulkinta` säilyvät datassa ja skeemassa, mutta sovellus ei lue niitä.
 
 ## Tavoitteet luonnollisesta kielestä
 
-Asetuksissa on **Tavoitteet omin sanoin** -kortti: vapaa tekstikenttä (esim. "painon lievä pudotus" tai "rasvan
-muuttaminen lihakseksi") ja muutaman valmiin kuvauksen painikkeet, joita saa muokata. Sovellus lähettää tekstin sekä
+Asetukset → Tavoitteet → taite **Ehdota tavoitteet omin sanoin**: vapaa tekstikenttä (esim. "painon lievä pudotus" tai
+"rasvan muuttaminen lihakseksi") ja **Ehdota**. Sovellus lähettää tekstin sekä
 lyhyen kuvan nykytilanteesta (ikä, pituus, uusin paino, treenit, nykyinen energiatavoite) työaseman palvelimelle, joka
 kutsuu aiops-välittäjää samalla tavalla kuin kuvasta ateria. Ilmari ehdottaa päivän energia- ja makrotavoitteet sekä
-lyhyen perustelun, ja ehdotus näkyy **tarkistettavana**: luvut voi muokata, ja vasta **Hyväksy ja tallenna** kirjoittaa
-tavoitteen. Hylättyä tai epäonnistunutta ehdotusta ei tallenneta, eikä olemassa olevaa tavoitetta muuteta.
+lyhyen perustelun, ja ehdotus näkyy **tarkistettavana**: luvut voi muokata, ja vasta **Ota käyttöön** kirjoittaa tavoitteen. Hylättyä tai epäonnistunutta ehdotusta ei tallenneta, eikä olemassa olevaa tavoitetta muuteta.
 
 **Rajapinta sovellukselle.** `POST /api/tavoitteet` (`palvelin/`, `tavoitteet.py`) JSON-rungolla `{"teksti": enintään
 500 merkkiä, "rooli"?: rooli, "profiili"?: enintään 300 merkkiä}`; sama Tailscale-tunnistus, Origin-sääntö ja 1 MiB:n
 runkoraja kuin muilla `/api`-reiteillä. Vastaus `{"ehdotus": {"energy","protein","carbs","fat"} luku|null,
 "perustelu": enintään 400 merkkiä, "oletukset": [enintään 10 × 300 merkkiä], "rooli", "malli"}`. Ilman
-`valittaja`-sokettia reitti vastaa 404 ja sovellus kertoo, ettei toiminto ole käytössä. Node-palvelimella (`server/`)
-reittiä ei ole.
+`valittaja`-sokettia reitti vastaa 404 ja sovellus kertoo, ettei toiminto ole käytössä.
 
 **Välittäjäkutsu.** `POST /v1/chat/completions` OpenAI-muotoisena JSONina: `model` on **rooli**, ei malli –
 `tavoite_ehdottaja` (Hubin valinta), `tavoite_ehdottaja_pilvi` (pakota pilvimalli) tai `tavoite_ehdottaja_paikallinen`
 (pakota paikallinen malli). Nämä roolit on kytkettävä malleihin Ilmari Hubissa, muuten reitti vastaa 404 "Roolille … ei
 ole mallia". Yksi `user`-viesti (suomenkielinen kehote, jossa tavoite ja nykytilanne **datana, ei järjestelmäohjeina**),
 `response_format: {"type":"json_object"}`, aikaraja 120 s ja sama enintään kahden samanaikaisen kutsun lukko kuin
-kuvassa. Roolia ei valita Asetuksista, joten käytetään aina Hubin valintaa; rooliperhe on varattu tulevaa valitsinta
-varten. Virheet 402/404/501/502/503 näytetään käyttäjälle suomeksi, ja lokiin kirjataan rooli, tila ja kesto — ei
-tavoitetta eikä lukuja.
+kuvassa. Sovellus lähettää aina roolin `tavoite_ehdottaja`. Käyttäjä näkee lyhyen suomenkielisen viestin tilan mukaan
+(esim. välittäjän 404 → 503 "Ilmari Hubissa ei ole mallia tavoite-ehdotukselle"), ja tekninen syy kirjataan lokiin
+(`tavoitteet: virhe N: …`) — ei tavoitetta eikä lukuja.
 
 **Numerot tarkistetaan koodissa** (palvelin `tavoitteet.py` ja selain `src/ai/tavoitteet.ts`, samat rajat): energia
 800–6 000 kcal, proteiini 30–250 g, hiilihydraatit 20–700 g ja rasva 20–200 g. Äärirajan alapuolelle jäävä arvo
@@ -202,13 +155,3 @@ tavoitteelta, joten Goal-skeemaa ei muuteta; rooli, malli ja perustelu näkyvät
 **Testit.** `palvelin/tests/test_tavoitteet.py` (reitti, roolit, numeroiden rajat, virheet ja lokitus väärennetyllä
 välittäjällä Unix-soketissa) ja `tests/tavoitteet.test.ts` (pyyntö, palvelinvirheiden näyttäminen, rajatarkistus ja
 hyväksytyn ehdotuksen tallentuminen Dexielle).
-
-## Live-aiopsiin kytkeminen: jäljellä oleva työ
-
-1. Hanki aiopsin lähdekoodi luettavaksi ja lue sen AGENTS.md, ADR-0003/0007/0010, gatewayn reitit ja job/tulosskeemat. Varmista nykyinen asennettu versio; toimitettu tilannekuva ei korvaa tarkastusta.
-2. Toteuta **erillinen rajattu tulosvälittäjä**, joka saa vain käyttäjän salliman työn rakenteisen tuloksen ja tämän vastaanotto-tokenin. Älä anna tokenia tai OpenAI-avainta verkkottomalle dispatcherille, gatewaylle tai `--network none` -laskentakontille. Valitse tuloksen lukureitti aiopsin oikean API-sopimuksen perusteella, älä suoraan SQLite-kannasta.
-3. Säilytä aiopsin nykyinen politiikka ja allekirjoitettu hyväksyntä. Jos myöhemmin halutaan työn luonti Ravintopolusta, se tarvitsee erikseen todennetun gateway-sopimuksen ja AI-agenttipolitiikan; tätä toimintoa ei toimituksessa ole.
-4. Päätä Ravintopolun **erillinen HTTPS-origin** ja sen yksityinen pääsy. Nykyinen gateway-root ja aiopsin vain tcp:443 -politiikka pidetään käytössä. Saman originin alihakemisto antaa Ravintopolun JS:lle aiops-reittien same-origin-oikeuden, vaikka SW olisi rajattu. Älä luo oletettuja `tailscale serve` -komentoja tai avaa reititintä tämän dokumentin perusteella.
-5. Testaa oikea hyväksytty työ → validoitu tulos → vastaanotto → puhelimen muokattava luonnos → hyväksyntä. Testaa väärä token, restricted, tunnisteristiriita, gatewayn pääsynesto, hylätty työ ja verkkokatkos. Varmista, että mitään ei tallennu päiväkirjaan ilman käyttäjän toimintaa.
-
-Alihakemistotuki (`APP_BASE_PATH` = käännöksen `VITE_APP_BASE`) mahdollistaa tulevan hallitun reitityksen mutta ei ratkaise originien välistä eristystä. Palvelin ei luota Tailscale-User-Login- tai X-Forwarded-Host-otsakkeisiin identiteettinä. Välitysprosessille annettu token on erillinen henkilökohtaisen Ravintopolku-palvelun oikeus, ei aiopsin hyväksyjän valta.
