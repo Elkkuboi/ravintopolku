@@ -64,9 +64,6 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
       port: 5173,
       strictPort: true,
-      proxy: {
-        [apiPrefix]: { target: "http://127.0.0.1:3001", changeOrigin: true },
-      },
     },
     preview: {
       host: "0.0.0.0",

@@ -20,7 +20,7 @@ import {
 } from "../src/domain/analytics";
 import { localDay, wallTimestamp, dayRange } from "../src/domain/dates";
 import { emptyDataset } from "../src/domain/model";
-import { parseDraft, MockProvider, DisabledProvider } from "../src/ai/provider";
+import { draftSchema, type AIDraft } from "../src/ai/provider";
 import { line, meal } from "./fixtures";
 describe("Ravintoainelaskenta", () => {
   it("150 g ja 200 kcal / 100 g on 300 kcal; pakkausenergia säilyy", () => {
@@ -137,29 +137,42 @@ describe("Helsingin päivät ja tilastot", () => {
     });
   });
 });
+const luonnos = (): AIDraft => ({
+  schemaVersion: 1,
+  name: "Testiannos",
+  lines: [
+    {
+      name: "Testiruoka",
+      mode: "portion",
+      grams: null,
+      values: { energy: 300, protein: 15, carbs: null, fat: null, fiber: null },
+      source: "Testi",
+      state: "",
+    },
+  ],
+  unknowns: [],
+  assumptions: [],
+  questions: [],
+  provenance: { provider: "testi", model: null, note: "" },
+});
 describe("AI-luonnokset", () => {
-  it("virheellinen JSON ja negatiiviset arvot hylätään", async () => {
-    expect(() => parseDraft("{bad")).toThrow();
-    const d = await new MockProvider().interpret();
+  it("kelvollinen luonnos hyväksytään; negatiiviset arvot ja tyhjä rivilista hylätään", () => {
+    expect(draftSchema.safeParse(luonnos()).success).toBe(true);
+    const d = luonnos();
     d.lines[0].values.energy = -1;
-    expect(() => parseDraft(JSON.stringify(d))).toThrow();
+    expect(draftSchema.safeParse(d).success).toBe(false);
+    expect(draftSchema.safeParse({ ...luonnos(), lines: [] }).success).toBe(
+      false,
+    );
   });
-  it("tuntematon annosmassa sallitaan luonnoksessa mutta ei lopullisessa per100-kirjauksessa", async () => {
-    const draft = await new MockProvider().interpret();
+  it("tuntematon annosmassa sallitaan luonnoksessa mutta ei lopullisessa per100-kirjauksessa", () => {
+    const draft = luonnos();
     draft.lines[0].mode = "per100";
     draft.lines[0].grams = null;
-    const parsed = parseDraft(JSON.stringify(draft));
+    const parsed = draftSchema.parse(draft);
     const l = { ...parsed.lines[0], id: id(), foodId: null };
     expect(lineNutrients(l).energy).toBeNull();
     expect(lineSchema.safeParse(l).success).toBe(false);
     expect(lineSchema.safeParse({ ...l, grams: 150 }).success).toBe(true);
-  });
-  it("disabled on aidosti poissa käytöstä ja mock merkitty simulaatioksi", async () => {
-    await expect(new DisabledProvider().interpret()).rejects.toThrow(
-      "ei ole käytössä",
-    );
-    expect((await new MockProvider().interpret()).provenance.note).toContain(
-      "Simulaatio",
-    );
   });
 });
