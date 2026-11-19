@@ -179,6 +179,8 @@ th:last-child, td:last-child { padding-right: 0; }   /* viimeisen sarakkeen täy
   .btn--quiet, label.inline, input:not([type="checkbox"]), select { min-height: 44px; }
   details > summary, .back { padding-top: .7rem; padding-bottom: .7rem; }
   input[type="checkbox"] { width: 1.4rem; height: 1.4rem; }
+  .brand { padding: .7rem 0; margin: -.7rem 0; }   /* kosketusalue 44 px, rivin korkeus ennallaan */
+  .foot .back { padding-top: .75rem; padding-bottom: .75rem; }
 }
 
 /* Ravintopolku: lisäykset Hubin tyyliin (hub.css). Ei uusia värejä: kaikki muuttujista. */

@@ -9,3 +9,6 @@
 .ruoka:hover { background: var(--sheet); color: var(--ink); }
 .ruoka .muted { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .poisto { margin-top: 2.25rem; }
+
+/* Tekstin sisäinen linkki: pystytäyte kasvattaa kosketusalueen 44 px:iin muuttamatta riviä. */
+p.muted > a { padding: .8rem 0; }
