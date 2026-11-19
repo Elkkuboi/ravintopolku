@@ -1,0 +1,11 @@
+/* Asetukset-sivu (src/nakymat/Asetukset.tsx, components/Tavoitteet.tsx, Tiedot.tsx, ProfileForm.tsx). Hubin luokat
+   tulevat style.css:stä; tässä vain sivun omat lisäykset. Ei värejä: kaikki muuttujista. */
+.lomake > * + * { margin-top: .9rem; }
+
+/* Omat ruuat: koko rivi on painike, joka avaa muokkauksen (poisto on muokkauksen sisällä). */
+.ruuat { padding: 0; list-style: none; }
+.ruuat > li { padding: 0; }
+.ruoka { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 1.2ch; width: 100%; min-height: 44px; padding: .55rem 0; border: 0; background: transparent; color: var(--ink); font-weight: 400; text-align: left; white-space: normal; }
+.ruoka:hover { background: var(--sheet); color: var(--ink); }
+.ruoka .muted { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.poisto { margin-top: 2.25rem; }

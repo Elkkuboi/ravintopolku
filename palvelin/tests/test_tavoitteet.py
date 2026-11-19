@@ -79,7 +79,7 @@ def test_makrojen_ja_energian_erosta_varoitetaan(client, valittaja):
 @pytest.mark.parametrize("sisalto,tila,viesti", [
     ({"energy": 300, "protein": 10}, 422, "Ilmari ei ehdottanut yhtään tavoitelukua"),
     ({"energy": None, "protein": None, "carbs": None, "fat": None}, 422, "ei ehdottanut yhtään tavoitelukua"),
-    ("en osaa sanoa", 502, "Mallin vastaus ei kelvannut tavoite-ehdotukseksi"),
+    ("en osaa sanoa", 502, "Ehdotus ei kelvannut. Yritä uudelleen."),
     ('{"a": "b"}', 422, "ei ehdottanut yhtään tavoitelukua"),
 ])
 def test_kelvoton_mallin_vastaus_on_virhe(client, valittaja, sisalto, tila, viesti):
@@ -91,34 +91,54 @@ def test_kelvoton_mallin_vastaus_on_virhe(client, valittaja, sisalto, tila, vies
 def test_tyhja_vastaus_ja_kielto(client, valittaja):
     valittaja.vastaa(200, {"choices": [{"message": {"content": "", "refusal": "en voi"}}]})
     r = laheta(client)
-    assert r.status_code == 422 and "Malli ei ehdottanut tavoitteita" in r.json()["virhe"]
+    assert r.status_code == 422 and "Ilmari ei osannut ehdottaa tavoitteita" in r.json()["virhe"]
     valittaja.vastaa(200, {"choices": [{"message": {"content": ""}}]})
-    assert "Malli ei palauttanut vastausta" in laheta(client).json()["virhe"]
+    r = laheta(client)
+    assert r.status_code == 502 and r.json()["virhe"] == "Ehdotus ei kelvannut. Yritä uudelleen."
 
 
+# Välittäjän tai tarjoajan englanninkielinen teksti ei koskaan päädy käyttäjälle, vain lokiin.
 @pytest.mark.parametrize("tila,runko,odotettu,viesti", [
     (402, {"error": {"message": "weekly budget exceeded", "type": "budget"}}, 402, "Viikon AI-budjetti on käytetty"),
-    (404, {"error": {"message": "no model for role", "type": "not_found"}}, 404,
-     "Roolille tavoite_ehdottaja ei ole mallia Ilmari Hubissa"),
-    (501, {"error": {"message": "json mode not available", "type": "unavailable"}}, 503, "Tavoite-ehdotus ei ole juuri nyt käytettävissä"),
-    (502, {"error": {"message": "upstream failed", "type": "upstream"}}, 502, "Mallin kutsu epäonnistui"),
-    (418, b"ei json", 502, "Välittäjä vastasi 418."),
-    (200, b"{ei json", 502, "vastausta ei voitu lukea"),
+    (404, {"error": {"message": "tuntematon rooli 'tavoite_ehdottaja'", "type": "not_found_error"}}, 503,
+     "Ilmari Hubissa ei ole mallia tavoite-ehdotukselle"),
+    (501, {"error": {"message": "json mode not available", "type": "unavailable"}}, 503,
+     "Ilmari ei ole nyt tavoitettavissa"),
+    (502, {"error": {"message": "tarjoaja vastasi HTTP 400: Unsupported parameter: 'temperature'",
+                     "type": "upstream"}}, 502, "Ehdotus epäonnistui"),
+    (418, b"ei json", 502, "Ehdotus epäonnistui"),
+    (200, b"{ei json", 502, "Ehdotus epäonnistui"),
 ])
-def test_valittajan_virheet_naytetaan_suomeksi(client, valittaja, tila, runko, odotettu, viesti):
+def test_valittajan_virheet_naytetaan_suomeksi(client, valittaja, caplog, tila, runko, odotettu, viesti):
     valittaja.vastaa(tila, runko)
-    r = laheta(client)
-    assert r.status_code == odotettu and viesti in r.json()["virhe"], r.text
-    if tila == 404:
-        assert "käsin Asetuksissa" in r.json()["virhe"]
+    with caplog.at_level(logging.WARNING, logger="ravintopolku"):
+        r = laheta(client)
+    virhe = r.json()["virhe"]
+    assert r.status_code == odotettu and viesti in virhe, r.text
+    assert "säädä tavoitteet käsin" in virhe
+    for tekninen in ("(", "HTTP", "tarjoaja", "rooli", "Välittäjä", "budget", "temperature", "json"):
+        assert tekninen not in virhe, virhe
+    assert "tavoitteet: virhe " in caplog.text
 
 
-def test_valittaja_poissa_on_503(polut):
+def test_tarjoajan_syy_menee_lokiin(client, valittaja, caplog):
+    valittaja.vastaa(502, {"error": {"message": "tarjoaja vastasi HTTP 400: Unsupported parameter: 'temperature'"}})
+    with caplog.at_level(logging.WARNING, logger="ravintopolku"):
+        r = laheta(client)
+    assert r.json() == {"virhe": "Ehdotus epäonnistui. Yritä uudelleen tai säädä tavoitteet käsin."}
+    assert "tarjoaja vastasi HTTP 400: Unsupported parameter" in caplog.text
+    assert "painon lievä pudotus" not in caplog.text
+
+
+def test_valittaja_poissa_on_503(polut, caplog):
     from pathlib import Path
     with TestClient(luo(asetukset(polut, valittaja=Path(polut / "ei-ole.sock"))), base_url="http://localhost",
                     client=None) as c:
-        r = laheta(c)
-        assert r.status_code == 503 and "Tavoite-ehdotus ei ole nyt käytettävissä" in r.json()["virhe"]
+        with caplog.at_level(logging.WARNING, logger="ravintopolku"):
+            r = laheta(c)
+        assert r.status_code == 503 and r.json()["virhe"] == (
+            "Ilmari ei ole nyt tavoitettavissa. Yritä myöhemmin uudelleen tai säädä tavoitteet käsin.")
+        assert "aiops-välittäjään ei saada yhteyttä" in caplog.text
 
 
 def test_ominaisuus_pois_paalta_on_404(polut):

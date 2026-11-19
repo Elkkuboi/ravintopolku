@@ -1,5 +1,0 @@
-/* VÄLIAIKAINEN: Asetukset-sivun (SettingsView.tsx) vanhat luokat uusilla väreillä. Asetukset-tekijä poistaa tämän
-   tiedoston ja sen tuonnin Asetukset.tsx:stä; uudet tyylit tiedostoon src/tyylit/asetukset.css. */
-.library-row { display: flex; align-items: center; gap: .4rem; border-bottom: 1px dotted var(--rule); padding: .55rem 0; }
-.library-row > div { flex: 1; min-width: 0; }
-.library-row small { display: block; color: var(--ink-3); }
