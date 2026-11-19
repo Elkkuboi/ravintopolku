@@ -1,4 +1,3 @@
-import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { labels, type Goal } from "../domain/model";
 import { formatNumber, type Totals } from "../domain/nutrition";
 import {
@@ -71,11 +70,7 @@ function Meter({ k, r }: { k: MeterKey; r: MeterReading }) {
           <span className={"nutrient-dot " + k} aria-hidden="true" />
           {label}
         </span>
-        {flag && (
-          <span className="meter-flag">
-            <AlertTriangle size={13} aria-hidden="true" /> {flag}
-          </span>
-        )}
+        {flag && <span className="meter-flag">{flag}</span>}
       </div>
       <div className="meter-numbers">
         <strong className="meter-value">
@@ -91,10 +86,7 @@ function Meter({ k, r }: { k: MeterKey; r: MeterReading }) {
               : ` / ${formatNumber(r.goal, 0)} ${unit}`}
           </span>
         </strong>
-        <span className={"meter-rest" + (over ? " over" : "")}>
-          {over && <ArrowUpRight size={14} aria-hidden="true" />}
-          {rest}
-        </span>
+        <span className={"meter-rest" + (over ? " over" : "")}>{rest}</span>
       </div>
       {r.goal === null || r.consumed === null ? (
         <div className="meter-track nogoal" aria-hidden="true" />

@@ -117,12 +117,10 @@ export function WeightForm({
 export function PainonKirjaus({
   date,
   weight,
-  demo = false,
   onSaved,
 }: {
   date: string;
   weight?: Weight;
-  demo?: boolean;
   onSaved: (viesti: string) => void;
 }) {
   const [text, setText] = useState(""),
@@ -130,7 +128,6 @@ export function PainonKirjaus({
   return (
     <form
       className="quick-paino"
-      hidden={demo}
       onSubmit={(e) => {
         e.preventDefault();
         void execute(async () => {

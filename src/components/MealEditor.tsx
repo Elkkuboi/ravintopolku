@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Plus, Trash2, Camera, Copy } from "lucide-react";
 import {
   type Dataset,
   type Meal,
@@ -288,20 +287,19 @@ export function MealEditor({
               {f.favorite ? "★ " : ""}
               {f.name}
               {f.state ? " · " + f.state : ""}
-              <Plus size={14} />
             </button>
           ))}
       </div>
       <div className="button-row">
         <button type="button" className="secondary" onClick={onNewFood}>
-          <Plus size={16} /> Luo oma ruoka
+          Luo oma ruoka
         </button>
         <button
           type="button"
           className="secondary"
           onClick={() => setLines([...lines, editLine(freshLine("portion"))])}
         >
-          <Plus size={16} /> Annoksen kokonaisarvot
+          Annoksen kokonaisarvot
         </button>
         <button
           type="button"
@@ -331,7 +329,7 @@ export function MealEditor({
               onClick={() => setLines(lines.filter((_, i) => i !== index))}
               aria-label={`Poista ruoka ${index + 1}`}
             >
-              <Trash2 size={18} />
+              Poista
             </button>
           </div>
           <Field label="Ruuan tai annoksen nimi">
@@ -394,7 +392,6 @@ export function MealEditor({
       <h3>Kuva ja muistiinpanot</h3>
       <div className="two-cols">
         <label className="photo-picker">
-          <Camera size={21} />
           <span>Ota kuva</span>
           <input
             type="file"
@@ -413,7 +410,6 @@ export function MealEditor({
           />
         </label>
         <label className="photo-picker">
-          <Camera size={21} />
           <span>Valitse kuva</span>
           <input
             type="file"
@@ -502,7 +498,7 @@ export function MealEditor({
             })
           }
         >
-          <Copy size={16} /> Kopioi ohje tekoälylle
+          Kopioi ohje tekoälylle
         </button>
         <Field label="AI:n JSON-vastaus">
           <textarea

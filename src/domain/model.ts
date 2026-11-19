@@ -1,4 +1,5 @@
 import { z } from "zod";
+import "../zod-asetus"; // ennen ensimmäistä skeemaa: kaikki skeemamoduulit tuovat tämän tiedoston
 export const TIMEZONE = "Europe/Helsinki";
 export const APP_VERSION = "1.1.0";
 export const keys = ["energy", "protein", "carbs", "fat", "fiber"] as const;

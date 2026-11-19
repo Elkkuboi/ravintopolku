@@ -1,18 +1,7 @@
 import { AIConnection } from "./AIConnection";
 import { SyncPanel } from "./SyncPanel";
-import { IntegrationInbox } from "./IntegrationInbox";
 import { useAIStatus } from "../ai/useAIStatus";
-import { type Luonnos } from "../ai/contracts";
 import { useState, useEffect } from "react";
-import {
-  Download,
-  Upload,
-  ShieldCheck,
-  Star,
-  Pencil,
-  Trash2,
-  Plus,
-} from "lucide-react";
 import { type Dataset, type Food, stamped } from "../domain/model";
 import {
   KUVA_ROOLIT,
@@ -76,18 +65,14 @@ export function SettingsView({
   data,
   onProfile,
   onFood,
-  onDemo,
   notify,
   run,
-  onIntegrationDraft,
 }: {
   data: Dataset;
   onProfile: () => void;
   onFood: (f?: Food) => void;
-  onDemo: () => void;
   notify: (s: string) => void;
   run: (f: () => Promise<void>) => Promise<void>;
-  onIntegrationDraft: (item: Luonnos) => void;
 }) {
   const {
     status: aiStatus,
@@ -134,7 +119,7 @@ export function SettingsView({
         <div className="section-heading">
           <h2>Profiili ja tavoitteet</h2>
           <button className="secondary" onClick={onProfile}>
-            <Pencil size={16} /> Muokkaa
+            Muokkaa
           </button>
         </div>
         <p>
@@ -167,25 +152,6 @@ export function SettingsView({
               </p>
             ))}
         </details>
-        <Field label="Ulkoasu">
-          <select
-            value={data.settings[0]?.theme ?? "system"}
-            onChange={(e) =>
-              void run(async () => {
-                await saveRecord("settings", {
-                  ...data.settings[0],
-                  ...stamped(data.settings[0]),
-                  theme: e.target.value as "light" | "dark" | "system",
-                });
-                notify("Ulkoasu tallennettu.");
-              })
-            }
-          >
-            <option value="system">Laitteen asetus</option>
-            <option value="light">Vaalea</option>
-            <option value="dark">Tumma</option>
-          </select>
-        </Field>
         <Field
           label="Kuvatunnistuksen lähde"
           hint="Kuvaa ateria -toiminto: paikallinen Ilmari työaseman palvelimen kautta (ei API-avainta) tai palvelimen OpenAI-API-avain. Molemmat lähettävät kuvan palvelimelle; ateria tallentuu heti ja voit muokata sitä."
@@ -357,7 +323,7 @@ export function SettingsView({
         <div className="section-heading">
           <h2>Omat ruuat</h2>
           <button className="secondary" onClick={() => onFood()}>
-            <Plus size={16} /> Uusi ruoka
+            Uusi ruoka
           </button>
         </div>
         <Field label="Hae ruokakirjastosta">
@@ -400,14 +366,14 @@ export function SettingsView({
                   })
                 }
               >
-                <Star size={19} fill={f.favorite ? "currentColor" : "none"} />
+                {f.favorite ? "Suosikki" : "Suosikiksi"}
               </button>
               <button
                 className="icon-button"
                 aria-label={`Muokkaa ruokaa ${f.name}`}
                 onClick={() => onFood(f)}
               >
-                <Pencil size={18} />
+                Muokkaa
               </button>
               <button
                 className="icon-button"
@@ -423,7 +389,7 @@ export function SettingsView({
                   })
                 }
               >
-                <Trash2 size={18} />
+                Poista
               </button>
             </div>
           ))}
@@ -450,7 +416,7 @@ export function SettingsView({
                 })
               }
             >
-              <Trash2 size={18} />
+              Poista
             </button>
           </div>
         ))}
@@ -458,7 +424,6 @@ export function SettingsView({
       <section className="card">
         <div className="section-heading">
           <h2>Varmuuskopio ja vienti</h2>
-          <ShieldCheck size={23} />
         </div>
         <p>
           Tiedot ovat tämän selaimen tallennuksessa tällä laitteella. Vie
@@ -470,10 +435,10 @@ export function SettingsView({
         </p>
         <div className="button-row">
           <button className="primary" onClick={() => void run(exportNow)}>
-            <Download size={18} /> Vie JSON-varmuuskopio
+            Vie JSON-varmuuskopio
           </button>
           <label className="secondary file-button">
-            <Upload size={18} /> Palauta varmuuskopio
+            Palauta varmuuskopio
             <input
               type="file"
               accept="application/json,.json"
@@ -547,19 +512,8 @@ export function SettingsView({
         </p>
       </section>
       <section className="card">
-        <h2>AI-palvelu ja ILMARI</h2>
+        <h2>AI-palvelu</h2>
         <AIConnection status={aiStatus} error={aiError} onRefresh={refreshAI} />
-        <IntegrationInbox data={data} onOpen={onIntegrationDraft} />
-      </section>
-      <section className="card">
-        <h2>Tutustu kokeilutilassa</h2>
-        <p className="muted small">
-          Eristetty esimerkkipäiväkirja näyttää kuvaajat. Omat kirjaukset
-          säilyvät; esimerkkejä ei viedä varmuuskopioon.
-        </p>
-        <button className="secondary" onClick={onDemo}>
-          Avaa kokeilutila
-        </button>
       </section>
       <button className="danger-link" onClick={() => setShowDelete(true)}>
         Poista kaikki omat tiedot

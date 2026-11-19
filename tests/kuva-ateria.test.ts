@@ -556,7 +556,7 @@ describe("kuvantulkinnan asetus", () => {
 // Kotinäkymän Kuvaa ateria -osa on Reactia, jota vitest (node-ympäristö) ei renderöi, joten sen
 // rakenne tarkistetaan lähteestä. Selainajo (tests/e2e) käyttää oikeaa DOMia, kun Chromium on asennettu.
 describe("Kuvaa ateria -näkymä", () => {
-  const lahde = readFileSync("src/App.tsx", "utf8");
+  const lahde = readFileSync("src/nakymat/Tanaan.tsx", "utf8");
   const osa =
     /<section className="card kuva-ateria">[\s\S]*?<\/section>/.exec(
       lahde,

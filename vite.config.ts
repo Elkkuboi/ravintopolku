@@ -18,13 +18,13 @@ export default defineConfig(({ mode }) => {
         manifest: {
           name: "Ravintopolku",
           short_name: "Ravintopolku",
-          description: "Oma ruokailun ja hyvinvoinnin päiväkirja",
+          description: "Ruokapäiväkirja",
           lang: "fi",
           start_url: base,
           scope: base,
           display: "standalone",
-          background_color: "#f5f7f2",
-          theme_color: "#315b43",
+          background_color: "#f1ead9",
+          theme_color: "#f1ead9",
           icons: [
             {
               src: base + "icon-192.png",
