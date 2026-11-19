@@ -222,12 +222,33 @@ def test_mallin_kelvoton_vastaus_on_virhe_eika_luonnosta(client, valittaja, sisa
     (200, {"choices": []}, 502, "Malli ei palauttanut vastausta"),
     (200, {"choices": [{"message": {"content": "", "refusal": "en voi"}}]}, 422, "Malli ei tulkinnut tätä kuvaa"),
 ])
-def test_valittajan_virheet_naytetaan_suomeksi(client, valittaja, tila, runko, odotettu, viesti):
+def test_valittajan_virheet_naytetaan_suomeksi(client, valittaja, tila, runko, odotettu, viesti, caplog):
     valittaja.vastaa(tila, runko)
-    r = laheta(client)
+    with caplog.at_level(logging.WARNING, logger="ravintopolku"):
+        r = laheta(client)
     assert r.status_code == odotettu and viesti in r.json()["virhe"]
-    if tila == 402:
-        assert r.json()["virhe"].endswith("(weekly budget exceeded)")
+    # tekninen syy vain lokiin: ei sulkuosaa eikä välittäjän englanninkielistä tekstiä käyttäjälle
+    assert "(" not in r.json()["virhe"]
+    if isinstance(runko, dict) and "error" in runko:
+        syy = runko["error"]["message"]
+        assert syy not in r.json()["virhe"]
+        assert any(syy in t.getMessage() and f"vastasi {tila}" in t.getMessage() for t in caplog.records)
+
+
+def test_tarjoajan_virhe_ei_paady_kayttajalle(client, valittaja, caplog):
+    syy = "tarjoaja vastasi HTTP 400: Unsupported parameter: 'temperature' is not supported with this model."
+    valittaja.vastaa(502, {"error": {"message": syy, "type": "upstream"}})
+    with caplog.at_level(logging.WARNING, logger="ravintopolku"):
+        r = laheta(client)
+    assert r.status_code == 502
+    assert r.json() == {"virhe": "Mallin kutsu epäonnistui välittäjässä. Yritä uudelleen."}
+    assert "HTTP 400" in caplog.text and "temperature" in caplog.text
+
+
+def test_puuttuvan_mallin_neuvo_ei_viittaa_poistettuun_asetukseen(client, valittaja):
+    valittaja.vastaa(404, {"error": {"message": "no model for role", "type": "not_found"}})
+    virhe = laheta(client).json()["virhe"]
+    assert "Asetuksista" not in virhe and "kirjaa ateria käsin" in virhe
 
 
 def test_valittaja_poissa_on_503(polut):
@@ -239,7 +260,8 @@ def test_valittaja_poissa_on_503(polut):
 
 
 @pytest.mark.parametrize("kuva_,kentat,odotettu,viesti", [
-    (b"x" * (kuva.KUVA_MAX + 1), {}, 413, "yli 8 MiB"),
+    (b"x" * (kuva.KUVA_MAX + 1), {}, 413, "Kuva on liian suuri tulkittavaksi"),
+    (b"\xff\xd8\xff" + b"\x00" * (kuva.KUVA_MAX - 2), {}, 413, "yli 700 kt"),
     (b"GIF89a" + b"\x00" * 100, {}, 400, "vain JPEG, PNG tai WebP"),
     (b"\xff\xd8", {}, 400, "vain JPEG, PNG tai WebP"),
     (JPEG, {"rooli": "gpt-4o"}, 400, "rooli:"),
@@ -252,6 +274,27 @@ def test_kelvoton_syote_hylataan_ennen_valittajaa(client, valittaja, kuva_, kent
     r = laheta(client, kuva_, **kentat)
     assert r.status_code == odotettu and viesti in r.json()["virhe"]
     assert valittaja.pyynnot == []
+
+
+def test_kokoraja_700_kt_rajalla_ja_rungon_kokoraja(client, valittaja):
+    assert kuva.KUVA_MAX == 700_000  # sama kuin sovelluksen LAHETYS_MAX (src/data/photos.ts)
+    rajalla = b"\xff\xd8\xff" + b"\x00" * (kuva.KUVA_MAX - 3)
+    assert laheta(client, rajalla).status_code == 200
+    assert len(valittaja.pyynnot) == 1
+    r = laheta(client, b"\xff\xd8\xff" + b"\x00" * (kuva.KUVA_MAX + 64 * 1024))  # runko yli rajan jo ennen jäsennystä
+    assert r.status_code == 413 and r.json() == {"virhe": kuva.LIIAN_SUURI}
+    assert len(valittaja.pyynnot) == 1
+
+
+def test_suurin_sallittu_pyynto_mahtuu_valittajan_rajaan():
+    # aiops-välittäjän PYYNTO_MAX on 1 MiB. Pahin tapaus: kuva rajalla ja 300 merkin vihje, jonka jokainen merkki
+    # koodautuu JSONissa kuuden tavun pakomerkiksi (ä -> \u00e4).
+    import base64
+    runko = kuva.pyynto("kuva_tulkki", "image/jpeg", base64.b64encode(b"\xff" * kuva.KUVA_MAX).decode("ascii"),
+                        "ä" * kuva.VIHJE_MAX)
+    assert len(json.dumps(runko).encode("utf-8")) < 1024 * 1024
+    liian = kuva.pyynto("kuva_tulkki", "image/jpeg", base64.b64encode(b"\xff" * 800_000).decode("ascii"))
+    assert len(json.dumps(liian).encode("utf-8")) > 1024 * 1024  # vanha 8 MiB:n raja olisi kaatunut välittäjään
 
 
 def test_ilman_kuvaa_ja_vaaralla_sisaltotyypilla(client, valittaja):

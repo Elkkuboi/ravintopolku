@@ -1,116 +1,109 @@
-// ILMARIn luonnoslaatikko: työaseman palvelimen /api/luonnokset (aiops ADR-0026), ei Node-palvelimen /api/inbox.
+// Ilmarin odottavat aterialuonnokset työaseman palvelimelta (/api/luonnokset, aiops ADR-0026). Osio näkyy vain, kun
+// luonnoksia on: ilman palvelinta, offline-tilassa tai tyhjällä laatikolla siitä ei jää riviäkään.
 import { useState, useEffect, useCallback } from "react";
 import { type Dataset } from "../domain/model";
 import { type Luonnos } from "../ai/contracts";
 import { haeLuonnokset, poistaLuonnos } from "../ai/luonnokset";
-import { connectionChanged } from "../ai/useAIStatus";
+const aika = new Intl.DateTimeFormat("fi-FI", {
+  day: "numeric",
+  month: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: "Europe/Helsinki",
+});
 export function IntegrationInbox({
   data,
+  paivitys,
   onOpen,
 }: {
   data: Dataset;
+  /** Kasvaa, kun luonnos on tallennettu ja kuitattu: laatikko haetaan uudelleen. */
+  paivitys: number;
   onOpen: (item: Luonnos) => void;
 }) {
   const [items, setItems] = useState<Luonnos[]>([]),
-    [available, setAvailable] = useState<boolean | null>(null),
     [error, setError] = useState("");
   const refresh = useCallback(async () => {
     if (!navigator.onLine) return;
     const tulos = await haeLuonnokset();
-    if (tulos.tila === "ok") {
-      setItems(tulos.luonnokset);
-      setAvailable(true);
-      setError("");
-    } else if (tulos.tila === "ei-palvelinta") {
-      setItems([]);
-      setAvailable(false);
-      setError("");
-    } else {
-      setError("Luonnosten haku epäonnistui: " + tulos.viesti);
-    }
+    if (tulos.tila === "ok") setItems(tulos.luonnokset);
+    else if (tulos.tila === "ei-palvelinta") setItems([]);
   }, []);
   useEffect(() => {
     const timer = setTimeout(() => void refresh(), 0);
     const listener = () => void refresh();
-    for (const name of ["ravintopolku-ai-changed", "online"])
-      window.addEventListener(name, listener);
+    window.addEventListener("online", listener);
     return () => {
       clearTimeout(timer);
-      for (const name of ["ravintopolku-ai-changed", "online"])
-        window.removeEventListener(name, listener);
+      window.removeEventListener("online", listener);
     };
-  }, [refresh]);
+  }, [refresh, paivitys]);
+  if (!items.length) return null;
   return (
-    <>
-      <h3>ILMARIn luonnoslaatikko</h3>
-      <p className="small muted">
-        Ilmari jättää aterialuonnokset työaseman palvelimelle, jossa ne
-        säilyvät enintään seitsemän päivää. Ne päätyvät päiväkirjaan vasta
-        sinun tarkistuksesi ja tallennuksesi jälkeen.
-      </p>
-      {available === false && (
-        <p className="muted small">
-          Luonnoslaatikko on käytettävissä työaseman palvelimen kautta tai
-          kirjautuneena AI-palveluun.
-        </p>
-      )}
-      {available && !items.length && (
-        <p className="muted small">Ei odottavia luonnoksia.</p>
-      )}
-      {items.map((item) => {
-        const saved = data.meals.some((m) =>
-          m.assumptions.includes("ILMARI-luonnos: " + item.id),
-        );
-        return (
-          <div className="card" key={item.id}>
-            <strong>{item.draft.name}</strong>
-            <p className="small muted">
-              {item.source} · {item.externalId} ·{" "}
-              {new Date(item.saapunut).toLocaleString("fi-FI")}
-            </p>
-            {saved ? (
-              <p className="small">
-                Tämä luonnos on jo tallennettu päiväkirjaan.
-              </p>
-            ) : (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => onOpen(item)}
-              >
-                Avaa tarkistettavaksi
-              </button>
-            )}
-            <button
-              type="button"
-              className="quiet"
-              onClick={() => {
-                if (
-                  !saved &&
-                  !window.confirm(
-                    "Poistetaanko tämä luonnos palvelimen laatikosta?",
-                  )
-                )
-                  return;
-                void poistaLuonnos(item.id)
-                  .then(() => connectionChanged())
-                  .catch((e) =>
-                    setError(
-                      e instanceof Error ? e.message : "Poisto epäonnistui.",
-                    ),
-                  );
-              }}
-            >
-              {saved ? "Merkitse käsitellyksi" : "Hylkää luonnos"}
-            </button>
-          </div>
-        );
-      })}
+    <section aria-label="Ilmarin luonnokset">
+      <h2 className="label">
+        Ilmarin luonnokset <span className="aside">{items.length}</span>
+      </h2>
+      <ul className="rows">
+        {items.map((item) => {
+          const saved = data.meals.some((m) =>
+            m.assumptions.includes("ILMARI-luonnos: " + item.id),
+          );
+          const saapui = new Date(item.saapunut);
+          return (
+            <li className="luonnos" key={item.id}>
+              <span>{item.draft.name}</span>
+              <span className="when">
+                {saved
+                  ? "tallennettu"
+                  : Number.isNaN(saapui.getTime())
+                    ? ""
+                    : aika.format(saapui).replace(" klo", "")}
+              </span>
+              <span className="actions">
+                {!saved && (
+                  <button
+                    type="button"
+                    className="btn--quiet"
+                    onClick={() => onOpen(item)}
+                  >
+                    Tarkista
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn--quiet"
+                  onClick={() => {
+                    if (
+                      !saved &&
+                      !window.confirm("Hylätäänkö Ilmarin luonnos?")
+                    )
+                      return;
+                    setError("");
+                    void poistaLuonnos(item.id)
+                      .then(refresh)
+                      .catch((e) =>
+                        setError(
+                          e instanceof Error
+                            ? e.message
+                            : "Poisto epäonnistui.",
+                        ),
+                      );
+                  }}
+                >
+                  {saved ? "Kuittaa" : "Hylkää"}
+                </button>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
       {error && (
-        <p className="error" role="alert">
+        <p className="note note--stop" role="alert">
           {error}
         </p>
       )}
-    </>
+    </section>
   );
 }

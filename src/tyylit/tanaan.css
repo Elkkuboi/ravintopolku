@@ -1,0 +1,48 @@
+/* Tänään-sivu, kuvapolku (KuvaLuonnos), käsin kirjaus (MealEditor) ja Ilmarin luonnokset. Pohja on style.css (Hub +
+   rp.css); tässä vain sivun omat lisäykset. Ei värejä: kaikki muuttujista. */
+
+/* Päivän vaihto: päivän nimen napautus avaa päivävalitsimen (näkymätön date-kenttä nimen päällä). */
+.day > * { margin-top: 0; }
+label.day-name { position: relative; display: flex; align-items: center; justify-content: center; min-height: 44px; margin: 0; font-size: inherit; color: var(--ink); cursor: pointer; }
+.day-name > input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+.day-name:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Energia ja makrot */
+.meter + .macros { margin-top: 1.1rem; }
+.figure-of.yli { color: var(--warn); }
+.meter--thin.meter--over > span { background: var(--warn); }
+
+/* Kuvanapit: rivien väli kuten mallissa; label ja button samalle linjalle */
+.capture { row-gap: 1.4rem; }
+.capture > * { margin-top: 0; }
+
+/* Ateriat, paino, taite */
+button.meal { font: inherit; }
+.inline-field .note { flex-basis: 100%; }
+section.actions > * { margin-top: 0; }
+label.inline.valmis { margin-top: 1.25rem; min-height: 44px; }
+label.inline.suosikki { margin-top: 1rem; min-height: 44px; }
+.label.ruoka-arvot { margin-top: 1.5rem; }
+
+/* Kuvapolku: pikkukuva ja kentät rinnakkain kuten mallissa */
+.draft-head > .thumb { flex: 1; min-width: 0; width: auto; }
+.draft-head .field:first-child { margin-top: 0; }
+.field > input.kello { width: auto; min-width: 9ch; }
+.oletukset { padding-left: 2ch; list-style: "- "; color: var(--ink-2); }
+.oletukset > li + li { margin-top: .25rem; }
+
+/* Ilmarin odottavat luonnokset */
+.rows > li.luonnos { display: grid; grid-template-columns: 1fr max-content; align-items: center; gap: .1rem 1.2ch; }
+.luonnos > .when { grid-column: 1; font-size: 13px; }
+.luonnos > .actions { grid-column: 2; grid-row: 1 / span 2; gap: .4rem; }
+
+/* Käsin kirjaus ja muokkaus (MealEditor) koko sivun ikkunassa */
+.ateria-ikkuna form > * + * { margin-top: 1rem; }
+.ateria-ikkuna form > .form-actions { margin-top: 1.5rem; }
+.rivi { border-top: 1px dotted var(--rule); padding-top: .8rem; }
+.rivi-paa { display: flex; align-items: flex-end; gap: 1ch; }
+.rivi-paa > .field { flex: 1; min-width: 0; margin-top: 0; }
+.ruuat { margin-top: .8rem; }
+.hallinta { margin-top: 2rem; border-top: 1px solid var(--rule); padding-top: .4rem; }
+.hallinta .inline-field input { width: auto; text-align: left; }
+.hallinta > * + * { margin-top: .8rem; }
