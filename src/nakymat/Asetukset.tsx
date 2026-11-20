@@ -1,10 +1,12 @@
-// Asetukset-sivu: Tavoitteet, Omat ruuat (taitettuna), Tiedot ja Ulkoasu. Värit valitaan Ilmari Hubissa.
+// Asetukset-sivu: Tavoitteet, Omat ruuat (taitettuna), Tiedot, Promptit (taitettuna) ja Ulkoasu. Värit valitaan
+// Ilmari Hubissa.
 import { useEffect, useState } from "react";
 import { type Food } from "../domain/model";
 import { formatNumber } from "../domain/nutrition";
 import { removeFood } from "../data/db";
 import { FoodForm } from "../components/FoodForm";
 import { Modal } from "../components/common";
+import { Promptit } from "../components/Promptit";
 import { Tavoitteet } from "../components/Tavoitteet";
 import { Tiedot } from "../components/Tiedot";
 import { hubOsoite, type NakymaProps } from "../kuori";
@@ -162,6 +164,7 @@ export default function Asetukset(props: NakymaProps) {
       <Tavoitteet data={props.data} notify={props.notify} />
       <OmatRuuat {...props} />
       <Tiedot {...props} />
+      <Promptit />
       <Ulkoasu />
     </>
   );
