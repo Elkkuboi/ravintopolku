@@ -12,7 +12,8 @@ on PWA. Päiväkirja on puhelimen selaimessa (IndexedDB), toimii ilman verkkoa j
   aiops-välittäjän kautta (rooli `kuva_tulkki`, Hub päättää mallin). Tulos on tallentamaton luonnos, jonka käyttäjä
   tarkistaa ja tallentaa tai hylkää.
 - **Kehitys**: paino, energia ja proteiini 7, 30 tai 90 päivältä tai koko ajalta; päivittäiset luvut taitettuna.
-- **Asetukset**: tavoitteet (myös ehdotus omin sanoin), omat ruuat, synkronoinnin tila, varmuuskopio ja CSV.
+- **Asetukset**: tavoitteet (myös ehdotus omin sanoin), omat ruuat, synkronoinnin tila, varmuuskopio ja CSV sekä
+  Promptit: kielimallin ohjeet sellaisinaan, vain luettavina.
 
 Tallennettu data säilyy laitteella ja palvelimella. Palvelin ottaa päivittäisen varmuuskopion (30 päivää). Kuvat
 pysyvät laitteella eivätkä synkronoidu. Yli 25 poistoa kerralla vaatii vahvistuksen Asetuksissa.
@@ -22,7 +23,7 @@ pysyvät laitteella eivätkä synkronoidu. Yli 25 poistoa kerralla vaatii vahvis
 - `src/`: React, TypeScript, Vite, Dexie (IndexedDB) ja Zod. Kuori on `App.tsx`, sivut `src/nakymat/`, tyyli
   `src/style.css` (Hubin tyyli ja neljä väriyhdistelmää) ja sivujen lisäykset `src/tyylit/`.
 - `palvelin/`: Python (Starlette, uv). Tarjoilee käännöksen ja reitit `/api/synk`, `/api/luonnokset`,
-  `/api/kuva-ateria`, `/api/tavoitteet` ja `/api/ulkoasu`. Tunnistus on Tailscale-identiteetti, ja CSP kieltää
+  `/api/kuva-ateria`, `/api/tavoitteet`, `/api/ulkoasu` ja `/api/kehotteet`. Tunnistus on Tailscale-identiteetti, ja CSP kieltää
   inline-skriptit ja -tyylit.
 - `scripts/asenna-tyoasema.sh`: käännös ja asennus työasemalle.
 

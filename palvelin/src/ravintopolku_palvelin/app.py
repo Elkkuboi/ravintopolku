@@ -7,7 +7,8 @@ aterialuonnokset luetaan pudotushakemistosta (aiops ADR-0026) ja tarjoillaan laa
 ateria (/api/kuva-ateria) kutsuu aiops-välittäjää Unix-soketissa (aiops ADR-0025/-0027); ilman konfiguroitua
 sokettia reitti vastaa 404. Tavoite-ehdotus (/api/tavoitteet) kutsuu välittäjää samoin tavoin: vapaasta tekstistä
 päivän tavoitearvot, jotka käyttäjä hyväksyy selaimessa (tavoitteet.py). Väriyhdistelmä (/api/ulkoasu) luetaan Ilmari
-Hubin evästeestä: palvelin vain lukee sen eikä koskaan aseta sitä.
+Hubin evästeestä: palvelin vain lukee sen eikä koskaan aseta sitä. Kielimallille annettavat ohjeet näkyvät sellaisinaan
+reitillä /api/kehotteet (Asetukset → Promptit, vain luku).
 """
 
 from __future__ import annotations
@@ -83,6 +84,20 @@ def vari(request: Request) -> str:
     """Hubin väri sallittujen listalta; evästeen merkkijonoa ei koskaan palauteta sellaisenaan."""
     arvo = request.cookies.get(VARI_EVASTE, "")
     return arvo if arvo in VARIT else VARIT[0]
+
+
+def kehotteet() -> list[dict[str, str]]:
+    """Kielimallille annettavat ohjeet sellaisinaan (Asetukset → Promptit, Elias 21.11.2026: jokainen prompti
+    näkyviin). Teksti tulee samoista funktioista kuin oikea kutsu, joten se ei voi erkaantua siitä, mitä malli saa.
+    Aaltosulkeissa ovat kohdat, joihin käyttäjän oma teksti tulee."""
+    return [
+        {"tunniste": "kuva", "otsikko": "Kuvasta ateriaksi",
+         "kuvaus": "Kun otat kuvan annoksesta tai tuoteselosteesta. Vihjeesi tulee perään.",
+         "teksti": kuva.kehote("{vihjeesi}")},
+        {"tunniste": "tavoitteet", "otsikko": "Tavoitteiden ehdotus",
+         "kuvaus": "Kun kuvaat tavoitteesi sanoin. Nykytilanteesi ja tavoitteesi tulevat perään.",
+         "teksti": tavoitteet.kehote("{tavoitteesi}", "{nykytilanteesi}")},
+    ]
 
 
 def luo(a: Asetukset) -> Starlette:
@@ -232,6 +247,9 @@ def luo(a: Asetukset) -> Starlette:
     async def api_ulkoasu(request: Request) -> Response:
         return JSONResponse({"vari": vari(request)})
 
+    async def api_kehotteet(request: Request) -> Response:
+        return JSONResponse({"kehotteet": kehotteet()})
+
     async def api_tuntematon(request: Request) -> Response:
         return JSONResponse({"virhe": "ei rajapintaa"}, status_code=404)
 
@@ -256,6 +274,7 @@ def luo(a: Asetukset) -> Starlette:
         Route("/api/kuva-ateria", api_kuva_ateria, methods=["POST"]),
         Route("/api/tavoitteet", api_tavoitteet, methods=["POST"]),
         Route("/api/ulkoasu", api_ulkoasu, methods=["GET"]),
+        Route("/api/kehotteet", api_kehotteet, methods=["GET"]),
         Route("/api/{polku:path}", api_tuntematon, methods=["GET", "POST", "DELETE"]),
         Mount("/", app=StaticFiles(directory=str(a.sovellus), html=True, check_dir=False)),
     ], middleware=[Middleware(BaseHTTPMiddleware, dispatch=vartija)], lifespan=elinkaari)

@@ -46,7 +46,8 @@ hae samasta osoitteesta uutta kuvaa.
 `palvelin/` (Python, Starlette, uv) kuuntelee Unix-soketissa, ja Tailscale Serve välittää siihen portista 8443. Se
 tarjoilee käännöksen turvaotsakkein (CSP ilman inline-skriptejä ja -tyylejä, `font-src 'self'`) ja reitit:
 `/api/synk` (synkronointi, aiops ADR-0016), `/api/luonnokset` (Ilmarin luonnokset, ADR-0026), `/api/kuva-ateria` ja
-`/api/tavoitteet` (aiops-välittäjän kautta, ADR-0025/-0027) sekä `/api/ulkoasu`. Tunnistus on Tailscale-identiteetti,
+`/api/tavoitteet` (aiops-välittäjän kautta, ADR-0025/-0027), `/api/ulkoasu` sekä `/api/kehotteet` (kielimallin ohjeet
+näytettäväksi sivulla Asetukset → Promptit; vain luku). Tunnistus on Tailscale-identiteetti,
 ja muuttavat pyynnöt vaativat saman alkuperän.
 
 Värit: Ilmari Hub asettaa evästeen `ilmari_vari`. Se on HttpOnly, joten sovellus kysyy värin reitiltä `/api/ulkoasu`

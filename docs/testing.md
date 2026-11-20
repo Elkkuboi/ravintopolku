@@ -52,7 +52,8 @@ Testi tarkistaa:
 ## Palvelin (pytest)
 
 `palvelin/tests/`: tunnistus ja turvaotsakkeet, synkronointi, luonnoslaatikko, kuvan tulkinta (700 kt:n raja,
-virheteksti ilman välittäjän tekstiä), tavoite-ehdotus, väri (`/api/ulkoasu`) ja woff2:n MIME-tyyppi.
+virheteksti ilman välittäjän tekstiä), tavoite-ehdotus, väri (`/api/ulkoasu`), kielimallin ohjeet (`/api/kehotteet`:
+samat tekstit kuin oikeassa kutsussa, vain luku) ja woff2:n MIME-tyyppi.
 
 ## Puhelimella tarkistettavat
 
