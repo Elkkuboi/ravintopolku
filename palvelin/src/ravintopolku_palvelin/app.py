@@ -149,9 +149,15 @@ def luo(a: Asetukset) -> Starlette:
     def kayttaja(request: Request) -> str:
         return a.kayttajat[request.headers["tailscale-user-login"]]
 
+    def omistus(request: Request) -> tuple[int, int]:
+        """Migraation oletusomistus (kayttaja_id, profiili_id) = (1, 1); API ei vielä tunne käyttäjä- tai
+        profiiliparametreja, joten kaikki pyynnöt kirjoitetaan ja luetaan oletusomistajana."""
+        return 1, 1
+
     async def api_tila(request: Request) -> Response:
+        k, p = omistus(request)
         async with lukko:
-            t = await run_in_threadpool(kanta.tilasto, yhteys)
+            t = await run_in_threadpool(kanta.tilasto, yhteys, k, p)
         return JSONResponse({**t, "kayttaja": kayttaja(request)})
 
     async def api_hae(request: Request) -> Response:
@@ -159,10 +165,11 @@ def luo(a: Asetukset) -> Starlette:
             jalkeen = int(request.query_params.get("jalkeen", "0"))
         except ValueError:
             return JSONResponse({"virhe": "jalkeen: kokonaisluku"}, status_code=400)
+        k, p = omistus(request)
         try:
             async with lukko:
-                muutokset, lisaa = await run_in_threadpool(kanta.hae, yhteys, jalkeen)
-                seq = await run_in_threadpool(kanta.suurin_seq, yhteys)
+                muutokset, lisaa = await run_in_threadpool(kanta.hae, yhteys, jalkeen, None, k, p)
+                seq = await run_in_threadpool(kanta.suurin_seq, yhteys, k, p)
         except kanta.Hylatty as e:
             return JSONResponse({"virhe": str(e)}, status_code=400)
         return JSONResponse({"muutokset": muutokset, "lisaa": lisaa, "seq": seq})
@@ -182,11 +189,13 @@ def luo(a: Asetukset) -> Starlette:
         if not isinstance(data, dict) or set(data) - {"jalkeen", "muutokset"}:
             return JSONResponse({"virhe": "runko: olio, jossa jalkeen ja muutokset"}, status_code=400)
         laite = f"{kayttaja(request)}@{request.headers.get('x-forwarded-for', '?')[:64]}"
+        k, p = omistus(request)
         try:
             async with lukko:
-                kuitatut = await run_in_threadpool(kanta.sovella, yhteys, data.get("muutokset", []), laite)
-                muutokset, lisaa = await run_in_threadpool(kanta.hae, yhteys, data.get("jalkeen", 0))
-                seq = await run_in_threadpool(kanta.suurin_seq, yhteys)
+                kuitatut = await run_in_threadpool(kanta.sovella, yhteys, data.get("muutokset", []), laite,
+                                                  None, k, p)
+                muutokset, lisaa = await run_in_threadpool(kanta.hae, yhteys, data.get("jalkeen", 0), None, k, p)
+                seq = await run_in_threadpool(kanta.suurin_seq, yhteys, k, p)
                 if kuitatut:
                     tila["likainen"] = True
                     if time.monotonic() - tila["viety"] >= VIENTI_VALI_S:  # muuten huoltosilmukka vie myöhemmin
@@ -196,9 +205,10 @@ def luo(a: Asetukset) -> Starlette:
         return JSONResponse({"kuitatut": kuitatut, "muutokset": muutokset, "lisaa": lisaa, "seq": seq})
 
     async def api_luonnokset(request: Request) -> Response:
+        k, p = omistus(request)
         async with lukko:
             await nouda_luonnokset()
-            odottavat = await run_in_threadpool(kanta.luonnokset_odottavat, yhteys)
+            odottavat = await run_in_threadpool(kanta.luonnokset_odottavat, yhteys, k, p)
         return JSONResponse({"luonnokset": odottavat})
 
     async def api_luonnos_valmis(request: Request) -> Response:

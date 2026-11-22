@@ -134,3 +134,70 @@ def test_vienti_ilman_poistoja(y, tmp_path):
     assert sisalto["taulut"]["foods"] == [] and "photos" not in sisalto["taulut"]
     assert stat.S_IMODE(os.stat(kohde).st_mode) == 0o640
     assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".")] == []
+
+
+def test_migraatio_luo_kayttajan_ja_profiilin():
+    yhteys = sqlite3.connect(":memory:", check_same_thread=False)
+    yhteys.executescript("CREATE TABLE merkinnat (taulu TEXT NOT NULL, id TEXT NOT NULL, data TEXT, "
+                         "poistettu INTEGER NOT NULL DEFAULT 0, seq INTEGER NOT NULL UNIQUE, saapunut TEXT NOT NULL, "
+                         "laite TEXT NOT NULL, PRIMARY KEY (taulu, id)); "
+                         "CREATE TABLE luonnokset (id INTEGER PRIMARY KEY, external_id TEXT NOT NULL, source TEXT NOT NULL, "
+                         "data TEXT, saapunut TEXT NOT NULL, tila TEXT NOT NULL DEFAULT 'pending', "
+                         "UNIQUE (source, external_id));")
+    yhteys.execute("INSERT INTO merkinnat (taulu, id, data, poistettu, seq, saapunut, laite) "
+                   "VALUES ('weights', 'a1', '{}', 0, 1, 't', 'x')")
+    kanta.migraatio(yhteys)
+    assert yhteys.execute("SELECT id, nimi FROM kayttajat").fetchall() == [(1, "elias")]
+    assert yhteys.execute("SELECT id, kayttaja_id, nimi FROM profiilit").fetchall() == [(1, 1, "Elias")]
+    assert yhteys.execute("SELECT kayttaja_id, profiili_id FROM merkinnat").fetchall() == [(1, 1)]
+    kanta.migraatio(yhteys)  # toisto on haitaton
+    assert yhteys.execute("SELECT COUNT(*) FROM kayttajat").fetchone()[0] == 1
+
+
+def test_omistukset_erottuvat_haussa_ja_laskussa(y):
+    kanta.sovella(y, [paino("a1", "2026-10-20", 80.0)], "puhelin", kayttaja_id=1, profiili_id=1)
+    k2 = kanta.kayttaja_lisaa(y, "matti")
+    p2 = kanta.profiili_lisaa(y, k2, "Matti")
+    kanta.sovella(y, [paino("b1", "2026-10-21", 90.0)], "puhelin", kayttaja_id=k2, profiili_id=p2)
+    muutokset, _ = kanta.hae(y, 0, kanta.HAKU_MAX, 1, 1)
+    assert [m["id"] for m in muutokset] == ["a1"] and [m["data"]["kg"] for m in muutokset] == [80.0]
+    assert kanta.tilasto(y, 1, 1) == {"seq": 1, "merkintoja": 1, "poistomerkintoja": 0}
+    assert kanta.tilasto(y, k2, p2) == {"seq": 2, "merkintoja": 1, "poistomerkintoja": 0}
+    assert kanta.suurin_seq(y, 1, 1) == 1 and kanta.suurin_seq(y, k2, p2) == 2
+
+
+def test_vienti_omistajakokeinen(y, tmp_path):
+    kanta.sovella(y, [paino("a1", "2026-10-20", 80.0)], "x")
+    k2 = kanta.kayttaja_lisaa(y, "matti")
+    kanta.sovella(y, [paino("b1", "2026-10-21", 70.0)], "x", kayttaja_id=k2, profiili_id=1)
+    kohde = tmp_path / "paivakirja.json"
+    kanta.vie(y, kohde, None, 1, 1)
+    sisalto = json.loads(kohde.read_text())
+    assert [m["id"] for m in sisalto["taulut"]["weights"]] == ["a1"]
+    assert sisalto["seq"] == 1
+
+
+def test_api_avaimet(y):
+    avain = "rp_" + "x" * 32
+    tunnus = kanta.avain_lisaa(y, 1, avain, "testilaitteeksi")
+    assert kanta.avain_vastaanota(y, avain) == 1
+    rivi = kanta.avaimet_listaa(y, 1)[0]
+    assert rivi["id"] == tunnus and rivi["etoniimi"] == "testilaitteeksi" and rivi["voimassa"] is True
+    assert kanta.avain_vastaanota(y, "rp_tuntematon_avain_" + "z" * 24) is None
+    assert kanta.avain_kielta(y, tunnus, 1) is True
+    assert kanta.avain_kielta(y, tunnus, 1) is False
+    assert kanta.avain_vastaanota(y, avain) is None
+
+
+def test_kayttaja_ja_profiili_toisto(y):
+    assert kanta.kayttaja_lisaa(y, "elias") == 1
+    assert kanta.kayttaja_lisaa(y, "matti") == 2
+    assert kanta.kayttaja_lisaa(y, "matti") == 2
+    p1 = kanta.profiili_lisaa(y, 2, "Matti")
+    assert kanta.profiili_lisaa(y, 2, "Matti") == p1
+    with pytest.raises(kanta.Hylatty):
+        kanta.profiili_lisaa(y, 99, "Ei ole")
+    with pytest.raises(kanta.Hylatty):
+        kanta.sovella(y, [paino("a1", "2026-10-20", 80.0)], "x", kayttaja_id=0)
+    with pytest.raises(kanta.Hylatty):
+        kanta.hae(y, 0, kanta.HAKU_MAX, True, 1)
