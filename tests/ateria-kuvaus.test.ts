@@ -8,7 +8,6 @@ import {
   TEKSTI_MIN,
   TEKSTI_MAX,
   YLEINEN_VIRHE,
-  vastausSchema,
   tulkitseKuvaus,
 } from "../src/ai/ateria-kuvaus";
 import { emptyNutrients } from "../src/domain/model";

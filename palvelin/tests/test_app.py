@@ -231,7 +231,7 @@ def test_kehotteet_ovat_samat_tekstit_jotka_malli_saa(client):
     assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
     assert r.headers["content-security-policy"] == CSP
     lista = r.json()["kehotteet"]
-    assert [k["tunniste"] for k in lista] == ["kuva", "tavoitteet"] and lista == sovellus.kehotteet()
+    assert [k["tunniste"] for k in lista] == ["kuva", "tavoitteet", "ateria-kuvaus"] and lista == sovellus.kehotteet()
     assert all(set(k) == {"tunniste", "otsikko", "kuvaus", "teksti"} for k in lista)
     # Teksti on täsmälleen se, minkä oikea kutsu lähettää, kun käyttäjän tekstin paikalla on paikanvaraaja.
     assert lista[0]["teksti"] == kuva.kehote("{vihjeesi}") and lista[0]["teksti"].startswith(kuva.kehote())
@@ -260,4 +260,7 @@ def test_jokainen_kehotefunktio_on_luettelossa():
     from ravintopolku_palvelin import app as sovellus
     moduulit = [m.name for m in pkgutil.iter_modules(ravintopolku_palvelin.__path__)
                 if hasattr(importlib.import_module(f"ravintopolku_palvelin.{m.name}"), "kehote")]
-    assert sorted(moduulit) == ["kuva", "tavoitteet"] == sorted(k["tunniste"] for k in sovellus.kehotteet())
+    # Moduulien nimet (alaviivalla) vastaavat kehotteiden tunnuksia (viholla):
+    # ateria_kuvaus -> ateria-kuvaus, kuva -> kuva, tavoitteet -> tavoitteet.
+    tunnistepari = {"ateria_kuvaus": "ateria-kuvaus", "kuva": "kuva", "tavoitteet": "tavoitteet"}
+    assert sorted(tunnistepari[m] for m in moduulit) == sorted(k["tunniste"] for k in sovellus.kehotteet())
