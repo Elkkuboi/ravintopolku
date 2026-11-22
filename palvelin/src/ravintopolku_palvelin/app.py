@@ -6,7 +6,9 @@ POST ja DELETE hyväksytään vain omasta alkuperästä. Rajapinnassa ei ole ver
 aterialuonnokset luetaan pudotushakemistosta (aiops ADR-0026) ja tarjoillaan laatikkoon /api/luonnokset. Kuvasta
 ateria (/api/kuva-ateria) kutsuu aiops-välittäjää Unix-soketissa (aiops ADR-0025/-0027); ilman konfiguroitua
 sokettia reitti vastaa 404. Tavoite-ehdotus (/api/tavoitteet) kutsuu välittäjää samoin tavoin: vapaasta tekstistä
-päivän tavoitearvot, jotka käyttäjä hyväksyy selaimessa (tavoitteet.py). Väriyhdistelmä (/api/ulkoasu) luetaan Ilmari
+päivän tavoitearvot, jotka käyttäjä hyväksyy selaimessa (tavoitteet.py). Ateria vapaasta tekstikuvauksesta (/api/ateria-kuvaus)
+kutsuu välittäjää samoin: kuvaus -> tarkistettu aterialuonnos, jonka käyttäjä tarkistaa ja tallentaa (ateria_kuvaus.py).
+Väriyhdistelmä (/api/ulkoasu) luetaan Ilmari
 Hubin evästeestä: palvelin vain lukee sen eikä koskaan aseta sitä. Kielimallille annettavat ohjeet näkyvät sellaisinaan
 reitillä /api/kehotteet (Asetukset → Promptit, vain luku).
 """
@@ -29,7 +31,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import kanta, kuva, luonnokset, tavoitteet
+from . import ateria_kuvaus, kanta, kuva, luonnokset, tavoitteet
 from .config import PORTTI, Asetukset
 
 PYYNTO_MAX = 1024 * 1024
@@ -97,6 +99,9 @@ def kehotteet() -> list[dict[str, str]]:
         {"tunniste": "tavoitteet", "otsikko": "Tavoitteiden ehdotus",
          "kuvaus": "Kun kuvaat tavoitteesi sanoin. Nykytilanteesi ja tavoitteesi tulevat perään.",
          "teksti": tavoitteet.kehote("{tavoitteesi}", "{nykytilanteesi}")},
+        {"tunniste": "ateria-kuvaus", "otsikko": "Ateria kuvauksesta",
+         "kuvaus": "Kun kirjoitat aterian vapaana tekstinä, esimerkiksi \"banaani\". Kuvauksesi tulee perään.",
+         "teksti": ateria_kuvaus.kehote("{ateriasi}")},
     ]
 
 
@@ -244,6 +249,29 @@ def luo(a: Asetukset) -> Starlette:
             return JSONResponse({"virhe": str(e)}, status_code=e.tila)
         return JSONResponse(tulos)
 
+    async def api_ateria_kuvaus(request: Request) -> Response:
+        """Ateria vapaasta tekstikuvauksesta (ateria_kuvaus.py): kuvaus -> tarkistettu aterialuonnos."""
+        if a.valittaja is None:
+            return JSONResponse({"virhe": "ateria kuvauksesta ei ole käytössä tällä palvelimella"}, status_code=404)
+        runko = b""
+        async for pala in request.stream():
+            runko += pala
+            if len(runko) > PYYNTO_MAX:
+                return JSONResponse({"virhe": "pyyntö on yli 1 MiB"}, status_code=413)
+        try:
+            try:
+                data = json.loads(runko)
+            except ValueError:
+                raise kuva.Virhe(400, "runko ei ole JSONia") from None
+            if not isinstance(data, dict):
+                raise kuva.Virhe(400, "runko: JSON-olio")
+            teksti, rooli = ateria_kuvaus.tarkista_pyynto(data)
+            async with kuvalukko:  # sama lukko: yksi ihminen ei hapoista useampaa mallia kerrallaan
+                tulos = await run_in_threadpool(ateria_kuvaus.tulkitse, str(a.valittaja), teksti, rooli)
+        except kuva.Virhe as e:
+            return JSONResponse({"virhe": str(e)}, status_code=e.tila)
+        return JSONResponse({"draft": tulos, "rooli": rooli})
+
     async def api_ulkoasu(request: Request) -> Response:
         return JSONResponse({"vari": vari(request)})
 
@@ -273,6 +301,7 @@ def luo(a: Asetukset) -> Starlette:
         Route("/api/luonnokset/{id:int}", api_luonnos_valmis, methods=["DELETE"]),
         Route("/api/kuva-ateria", api_kuva_ateria, methods=["POST"]),
         Route("/api/tavoitteet", api_tavoitteet, methods=["POST"]),
+        Route("/api/ateria-kuvaus", api_ateria_kuvaus, methods=["POST"]),
         Route("/api/ulkoasu", api_ulkoasu, methods=["GET"]),
         Route("/api/kehotteet", api_kehotteet, methods=["GET"]),
         Route("/api/{polku:path}", api_tuntematon, methods=["GET", "POST", "DELETE"]),

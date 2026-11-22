@@ -88,6 +88,18 @@ describe("synkronoi", () => {
     expect((await d.table("foods").toArray()).map((r) => r.id).sort()).toEqual(["f1", "f2"]);
   });
 
+  it("lähentää enintään 20 sivua kerrallaan, loput lähtevät seuraavalla synkronoinnilla", async () => {
+    const d = kanta();
+    await d.table("foods").bulkPut(Array.from({ length: 10100 }, (_, i) => ruoka(`f${i}`, `ruoka ${i}`)));
+    const hae = vi.fn().mockResolvedValue(
+      vastaus({ kuitatut: [], muutokset: [], lisaa: false, seq: 1 }));
+    expect(await synkronoi(d, hae)).toEqual({ tila: "ok", lahetetty: 10100, vastaanotettu: 0, seq: 1 });
+    expect(hae).toHaveBeenCalledTimes(20);
+    // 20 sivua lähetettiin, loput jäävät: toisella synkronoinnilla lähtee vain jäännös
+    expect(await synkronoi(d, hae)).toEqual({ tila: "ok", lahetetty: 100, vastaanotettu: 0, seq: 1 });
+    expect(hae).toHaveBeenCalledTimes(21);
+  }, 30000);
+
   it("ilman palvelinta mitään ei muutu", async () => {
     const d = kanta();
     await d.table("foods").put(ruoka("f1", "puuro"));

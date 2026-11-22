@@ -104,7 +104,8 @@ export async function synkronoi(
       return { tila: "vahvista-poistot", poistoja };
     let { seq } = await synkTila(database);
     let vastaanotettu = 0;
-    for (let i = 0; i === 0 || i < muutokset.length; i += ERA) {
+    // Sivuilla siirretään muutoksia, mutta enintään 20 sivua kerrallaan: loput lähtevät seuraavalla synkronoinnilla.
+    for (let i = 0, sivut = 0; i === 0 || (i < muutokset.length && sivut < 20); i += ERA, sivut++) {
       const era = muutokset.slice(i, i + ERA);
       const r = await hae("/api/synk", {
         method: "POST",

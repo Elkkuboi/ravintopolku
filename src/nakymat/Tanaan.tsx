@@ -30,6 +30,7 @@ import "../tyylit/tanaan.css";
 type Dialog = {
   meal?: Meal;
   initialDraft?: AIDraft;
+  initialOrigin?: string;
   inboxId?: string;
   initialPhoto?: Photo;
   initialNote?: string;
@@ -256,6 +257,7 @@ export default function Tanaan({ data, notify, run }: NakymaProps) {
               date={date}
               meal={dialog.meal}
               initialDraft={dialog.initialDraft}
+              initialOrigin={dialog.initialOrigin}
               inboxId={dialog.inboxId}
               initialPhoto={dialog.initialPhoto}
               initialNote={dialog.initialNote}
