@@ -12,7 +12,10 @@ import {
   type DayStatus,
   type Settings,
   type Dataset,
+  type Profiili,
+  type Luonnos,
   emptyDataset,
+  profiiliSkeema,
   mealSchema,
   foodSchema,
   weightSchema,
@@ -26,6 +29,8 @@ import {
 import { mealSnapshot } from "../domain/nutrition";
 import { localDay, localTime, wallTimestamp } from "../domain/dates";
 export class DiaryDB extends Dexie {
+  profiilit!: EntityTable<Profiili, "id">;
+  luonnokset!: EntityTable<Luonnos, "id">;
   profiles!: EntityTable<Profile, "id">;
   goals!: EntityTable<Goal, "id">;
   foods!: EntityTable<Food, "id">;
@@ -55,9 +60,27 @@ export class DiaryDB extends Dexie {
       synkPohja: "[taulu+id]",
       synkTila: "avain",
     });
+    // Profiilit (käyttäjätilit) ja aterian luonnokset; olemassa oleva data siirretään oletusprofiiliin.
+    this.version(3).stores({
+      profiilit: "id,&aktiivinen",
+      luonnokset: "id,&profiiliId",
+    }).upgrade(async (db) => {
+      const id = crypto.randomUUID();
+      await db.table("profiilit").put({
+        id, name: "Oletus", aktiivinen: true, luotu: new Date().toISOString(),
+      });
+      const taulut = ["profiles", "goals", "foods", "meals", "templates", "weights", "lifestyles", "days"];
+      await Promise.all(taulut.map(async (t) => {
+        const rivit = await db.table(t).toArray();
+        for (const r of rivit) if (!("profiiliId" in r)) r.profiiliId = id;
+        await db.table(t).bulkPut(rivit);
+      }));
+    });
   }
 }
 export const db = new DiaryDB();
+// Taulut, joita readDataset lukee. Profiilit ja luonnokset ovat paikallisia: niitä ei synkronoida
+// palvelimeen, joten ne eivät ole SYNKATTAVAT-listalla, mutta ovat Datasetin mukana UI:lle.
 export const tableNames = Object.keys(emptyDataset()) as (keyof Dataset)[];
 export async function readDataset(database = db): Promise<Dataset> {
   const lists = await database.transaction("r", database.tables, () =>
@@ -67,12 +90,82 @@ export async function readDataset(database = db): Promise<Dataset> {
     tableNames.map((name, i) => [name, lists[i]]),
   ) as unknown as Dataset;
 }
+/** Palauttaa kaikki profiilit; aktiivinen ensimmäisenä. Jos profiileja ei ole, luodaan oletusprofiili. */
+export async function listProfiilit(database = db): Promise<Profiili[]> {
+  const lista = await database.table("profiilit").toArray();
+  if (!lista.length) {
+    const oletus = { id: crypto.randomUUID(), name: "Oletus", aktiivinen: true, luotu: new Date().toISOString() };
+    await database.table("profiilit").put(oletus);
+    return [oletus];
+  }
+  // Aktiivinen ensin, loput luomispäivämäärän mukaan.
+  return [...lista].sort((a, b) =>
+    (b.aktiivinen ? 1 : 0) - (a.aktiivinen ? 1 : 0) || a.luotu.localeCompare(b.luotu),
+  );
+}
+/** Valitsee profiilin aktiiviseksi. Muutetaan vain profiilit-taulua; synkronointi käynnistyy uudelleen. */
+export async function setAktiivinenProfiili(id: string, database = db): Promise<Profiili | null> {
+  return database.transaction("rw", database.table("profiilit"), async () => {
+    const kaikki = await database.table("profiilit").toArray();
+    for (const p of kaikki) {
+      const uudeh = { ...p, aktiivinen: p.id === id };
+      await database.table("profiilit").put(uudeh);
+    }
+    return (await database.table("profiilit").get(id)) ?? null;
+  });
+}
+/** Luo uuden profiilin. Jos se on ensimmäinen, se on aktiivinen; muuten ei. */
+export async function luoProfiili(nimi: string, database = db): Promise<Profiili> {
+  return database.transaction("rw", database.table("profiilit"), async () => {
+    const kaikki = await database.table("profiilit").toArray();
+    const profiili: Profiili = {
+      id: crypto.randomUUID(),
+      name: nimi,
+      aktiivinen: kaikki.length === 0,
+      luotu: new Date().toISOString(),
+    };
+    await database.table("profiilit").put(profiili);
+    return profiili;
+  });
+}
+/** Poistaa profiilin. Profiili ei poista sen alla olevaa dataa (ateriat, painot). */
+export async function poistaProfiili(id: string, database = db): Promise<void> {
+  await database.table("profiilit").delete(id);
+}
+/** Aktiivisen profiilin tunniste; tarvitaan tietueiden profiilikenttään. */
+export async function aktiivinenProfiiliId(database = db): Promise<string> {
+  const lista = await database.table("profiilit").toArray();
+  const aktiivinen = lista.find((p) => p.aktiivinen);
+  if (aktiivinen) return aktiivinen.id;
+  if (!lista.length) {
+    const oletus: Profiili = {
+      id: crypto.randomUUID(),
+      name: "Oletus",
+      aktiivinen: true,
+      luotu: new Date().toISOString(),
+    };
+    await database.table("profiilit").put(oletus);
+    return oletus.id;
+  }
+  const ensimmainen = lista[0];
+  await database.table("profiilit").put({ ...ensimmainen, aktiivinen: true });
+  return ensimmainen.id;
+}
+/** API-avain (joka mahdollisesti jaetaan kaverille) tallennetaan localStorageiin. */
+const AVAIN = "ravintopolku-api-avain";
+export function getAPIAvain(): string {
+  try { return localStorage.getItem(AVAIN) ?? ""; } catch { return ""; }
+}
+export function setAPIAvain(avain: string): void {
+  try { localStorage.setItem(AVAIN, avain); } catch { /* ohita, esim. private mode */ }
+}
 export async function saveRecord<K extends Exclude<keyof Dataset, "photos">>(
   table: K,
-  record: Dataset[K][number],
+  record: Omit<Dataset[K][number], "profiiliId"> & { profiiliId?: string },
   database = db,
 ) {
   const schemas = {
+    profiilit: profiiliSkeema,
     profiles: profileSchema,
     goals: goalSchema,
     foods: foodSchema,
@@ -82,14 +175,23 @@ export async function saveRecord<K extends Exclude<keyof Dataset, "photos">>(
     lifestyles: lifestyleSchema,
     days: dayStatusSchema,
     settings: settingsSchema,
-  };
-  const parsed = schemas[table].parse(record);
+  } as const;
+  const PROFILITARVITTEEN = new Set(["goals", "foods", "meals", "templates", "weights", "lifestyles", "days"]);
+  const rekordi = record as { profiiliId?: string };
+  const rivi = PROFILITARVITTEEN.has(table)
+    ? { ...rekordi, profiiliId: rekordi.profiiliId ?? (await aktiivinenProfiiliId(database)) }
+    : rekordi;
+  const skeema = schemas[table as keyof typeof schemas];
+  const parsed = skeema.parse(rivi);
   await database.table(table).put(parsed);
 }
 // These operations keep IndexedDB details out of forms.
 /** Korvaa päivän tavoitteen profiilia koskematta. Ilmarin tavoite-ehdotus hyväksytään tästä. */
-export async function saveGoal(goal: Goal, database = db) {
-  const g = goalSchema.parse(goal);
+export async function saveGoal(goal: Omit<Goal, "profiiliId"> & { profiiliId?: string }, database = db) {
+  const g = goalSchema.parse({
+    ...goal,
+    profiiliId: goal.profiiliId ?? (await aktiivinenProfiiliId(database)),
+  });
   await database.transaction("rw", database.goals, async () => {
     const existing = await database.goals
       .where("effectiveDate")
@@ -106,7 +208,7 @@ export const removeWeight = (id: string, database = db) =>
 export const removeFood = (id: string, database = db) =>
   database.foods.delete(id);
 export async function saveMeal(
-  meal: Meal,
+  meal: Omit<Meal, "profiiliId"> & { profiiliId?: string },
   photo: Photo | null,
   removePhoto = false,
   database = db,
@@ -115,6 +217,7 @@ export async function saveMeal(
     ...meal,
     snapshot: mealSnapshot(meal.lines),
     timestamp: wallTimestamp(meal.date, meal.time),
+    profiiliId: meal.profiiliId ?? (await aktiivinenProfiiliId(database)),
   });
   await database.transaction(
     "rw",

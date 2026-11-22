@@ -120,6 +120,7 @@ describe("IndexedDB ja varmuuskopiot", () => {
       date: "2026-10-02",
       kg: 75,
       note: "",
+      profiiliId: "p1",
     });
     const b = await exportBackup(db);
     const extra = {
@@ -129,6 +130,7 @@ describe("IndexedDB ja varmuuskopiot", () => {
       source: "Pakkaus",
       per100: emptyNutrients(),
       favorite: false,
+      profiiliId: "p1",
     };
     await db.foods.put(extra);
     db.weights.hook("creating", () => {

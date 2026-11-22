@@ -86,9 +86,10 @@ export function rakennaAteria(
     photoId: string | null;
   },
   lines: MealLine[],
-): Meal {
+): Omit<Meal, "profiiliId"> & { profiiliId?: string } {
   return {
     ...stamped(meal),
+    ...(meal?.profiiliId ? { profiiliId: meal.profiiliId } : {}),
     date: kentat.date,
     time: kentat.time,
     timestamp: wallTimestamp(kentat.date, kentat.time),
