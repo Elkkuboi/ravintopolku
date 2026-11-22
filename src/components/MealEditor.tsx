@@ -17,6 +17,7 @@ import { formatNumber, aggregate, lineNutrients } from "../domain/nutrition";
 import { draftOrigin, draftNotes } from "../ai/draft-fields";
 import { ateriatyyppi } from "../ai/kuva-ateria";
 import { type AIDraft } from "../ai/provider";
+import { tulkitseKuvaus } from "../ai/ateria-kuvaus";
 import { aterianKopio, kuvastaTulkittu } from "../nakymat/paiva";
 import { Field, Decimal, Form, NutrientFields, BlobImage } from "./common";
 import { parseNutrients } from "./form-values";
@@ -45,6 +46,7 @@ export function MealEditor({
   onSaved,
   onDone,
   initialDraft,
+  initialOrigin,
   inboxId,
   initialPhoto,
   initialNote,
@@ -56,6 +58,8 @@ export function MealEditor({
   /** Kopiointi tai poisto valmis: ikkuna suljetaan ja viesti näytetään. */
   onDone: (viesti: string) => void;
   initialDraft?: AIDraft;
+  /** Alkuperän etuliite luonnokselle, esim. "Kuvauksesta"; oletus on ILMARI. */
+  initialOrigin?: string;
   inboxId?: string;
   /** Kuva, jonka tulkinta epäonnistui: ateria kirjataan käsin ja kuva liitetään siihen. */
   initialPhoto?: Photo;
@@ -67,12 +71,6 @@ export function MealEditor({
       meal?.type ?? ateriatyyppi(defaultMealTime(date)),
     ),
     [note, setNote] = useState(meal?.note ?? initialNote ?? ""),
-    origin = initialDraft
-      ? draftOrigin(initialDraft, "ilmari")
-      : (meal?.origin ?? "Käsin kirjattu"),
-    assumptions = initialDraft
-      ? draftNotes(initialDraft, inboxId)
-      : (meal?.assumptions ?? []),
     [lines, setLines] = useState<EditableLine[]>(
       initialDraft
         ? initialDraft.lines.map((l) =>
@@ -85,8 +83,44 @@ export function MealEditor({
     [photo, setPhoto] = useState<Photo | null>(
       savedPhoto ?? initialPhoto ?? null,
     ),
-    [removedPhoto, setRemovedPhoto] = useState(false);
+    [removedPhoto, setRemovedPhoto] = useState(false),
+    [kuvaus, setKuvaus] = useState(""),
+    [tulostettava, setTulostettava] = useState<AIDraft | null>(null),
+    [tulkitseminen, setTulkitseminen] = useState(false),
+    [tulitusVirhe, setTulitusVirhe] = useState("");
+  const origin = initialDraft
+    ? (initialOrigin
+        ? `${initialOrigin} ${draftOrigin(initialDraft, "ilmari")}`
+        : draftOrigin(initialDraft, "ilmari"))
+    : tulostettava
+      ? "Kuvauksesta " + draftOrigin(tulostettava, "ilmari")
+      : (meal?.origin ?? "Käsin kirjattu"),
+    assumptions = initialDraft
+      ? draftNotes(initialDraft, inboxId)
+      : tulostettava
+        ? draftNotes(tulostettava)
+        : (meal?.assumptions ?? []);
   const { error, busy, execute } = useFormAction();
+  const tulkitse = () =>
+    void (
+      async () => {
+        setTulkitseminen(true);
+        setTulitusVirhe("");
+        try {
+          const tulos = await tulkitseKuvaus(kuvaus);
+          setTulostettava(tulos.draft);
+          setLines(
+            tulos.draft.lines.map((l) => editLine({ ...l, id: id(), foodId: null })),
+          );
+          setNote(tulos.draft.name || kuvaus.trim());
+          setKuvaus("");
+        } catch (e) {
+          setTulitusVirhe(e instanceof Error ? e.message : "Tulkinta epäonnistui.");
+        } finally {
+          setTulkitseminen(false);
+        }
+      }
+    )();
   const update = (index: number, change: Partial<EditableLine>) =>
     setLines(lines.map((l, i) => (i === index ? { ...l, ...change } : l)));
   const updateMeta = (index: number, change: Partial<MealLine>) =>
@@ -262,6 +296,34 @@ export function MealEditor({
             + rivi per 100 g
           </button>
         </div>
+        {!meal && (
+          <>
+            <Field label="Tai kirjoita ateria, ja Ilmari täydentää luvut">
+              <input
+                value={kuvaus}
+                onChange={(e) => setKuvaus(e.target.value)}
+                placeholder="esim. banaani"
+                maxLength={500}
+                aria-label="Aterian kuvaus"
+              />
+            </Field>
+            <div className="actions">
+              <button
+                type="button"
+                className="btn"
+                disabled={tulkitseminen || !kuvaus.trim()}
+                onClick={tulkitse}
+              >
+                {tulkitseminen ? "Tulkitsee…" : "Tulkitse"}
+              </button>
+            </div>
+          </>
+        )}
+        {tulitusVirhe && (
+          <p className="note note--stop" role="alert">
+            {tulitusVirhe}
+          </p>
+        )}
         {data.foods.length > 0 && (
           <details className="fold">
             <summary>Omat ruuat</summary>
@@ -315,7 +377,11 @@ export function MealEditor({
             </span>
           </div>
         )}
-        <Field label={kuvastaTulkittu(origin) ? "Nimi" : "Muistiinpano"}>
+        <Field
+          label={
+            (kuvastaTulkittu(origin) || tulostettava !== null) ? "Nimi" : "Muistiinpano"
+          }
+        >
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -323,7 +389,7 @@ export function MealEditor({
             rows={2}
           />
         </Field>
-        {(meal || photo || initialDraft) && (
+        {(meal || photo || initialDraft || tulostettava) && (
           <details className="fold">
             <summary>Kuva ja alkuperä</summary>
             {photo && (
