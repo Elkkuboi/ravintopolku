@@ -191,7 +191,7 @@ export function hyvaksyTavoite(
   arvot: Nutrients,
   pvm: string,
   current?: Goal,
-): Goal {
+): Omit<Goal, "profiiliId"> & { profiiliId?: string } {
   return {
     ...stamped(),
     effectiveDate: pvm,
@@ -205,6 +205,7 @@ export function hyvaksyTavoite(
       fat: arvot.fat,
       fiber: arvot.fiber ?? current?.nutrients.fiber ?? null,
     },
+    ...(current?.profiiliId ? { profiiliId: current.profiiliId } : {}),
   };
 }
 
@@ -218,7 +219,7 @@ export function tavoiteLomakkeesta(
   tavoitepaino: number | null,
   pvm: string,
   nykyinen?: Goal,
-): Goal {
+): Omit<Goal, "profiiliId"> & { profiiliId?: string } {
   if (
     tavoitepaino !== null &&
     (tavoitepaino < PAINO_MIN || tavoitepaino > PAINO_MAX)
@@ -235,5 +236,6 @@ export function tavoiteLomakkeesta(
     targetWeight: tavoitepaino,
     targetDate: tavoitepaino === null ? null : (nykyinen?.targetDate ?? null),
     nutrients: { ...arvot },
+    ...(nykyinen?.profiiliId ? { profiiliId: nykyinen.profiiliId } : {}),
   };
 }

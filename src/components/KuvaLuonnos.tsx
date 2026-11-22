@@ -26,7 +26,7 @@ import { TANAAN_ALKUUN } from "../kuori";
 
 type Vaihe = "valittu" | "tulkitaan" | "virhe" | "luonnos";
 interface Luonnos {
-  pohja: Meal;
+  pohja: Omit<Meal, "profiiliId"> & { profiiliId?: string };
   nimi: string;
   kello: string;
   rivit: LuonnosRivi[];

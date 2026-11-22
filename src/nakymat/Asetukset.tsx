@@ -9,6 +9,7 @@ import { Modal } from "../components/common";
 import { Promptit } from "../components/Promptit";
 import { Tavoitteet } from "../components/Tavoitteet";
 import { Tiedot } from "../components/Tiedot";
+import { APIAvainAsetukset } from "../components/APIAvainAsetukset";
 import { hubOsoite, type NakymaProps } from "../kuori";
 import { normalisoiVari, type Vari } from "../vari";
 import "../tyylit/asetukset.css";
@@ -162,6 +163,7 @@ export default function Asetukset(props: NakymaProps) {
   return (
     <>
       <Tavoitteet data={props.data} notify={props.notify} />
+      <APIAvainAsetukset notify={props.notify} />
       <OmatRuuat {...props} />
       <Tiedot {...props} />
       <Promptit />

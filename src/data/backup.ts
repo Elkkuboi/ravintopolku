@@ -11,7 +11,6 @@ import {
   settingsSchema,
   TIMEZONE,
   APP_VERSION,
-  type Dataset,
   type Photo,
 } from "../domain/model";
 import { db, readDataset, tableNames, type DiaryDB } from "./db";
@@ -94,9 +93,11 @@ export function parseBackup(text: string): Backup {
           .join("; "),
     );
   const b = parsed.data;
+  const PAIKALLISET = new Set(["profiilit", "luonnokset"]);
   for (const table of tableNames) {
+    if (PAIKALLISET.has(table)) continue;
     const seen = new Set<string>();
-    for (const row of b.data[table]) {
+    for (const row of b.data[table as keyof typeof b.data]) {
       if (seen.has(row.id))
         throw new Error("Varmuuskopiossa on päällekkäinen tunniste.");
       seen.add(row.id);
@@ -132,13 +133,14 @@ export function parseBackup(text: string): Backup {
 }
 export async function exportBackup(database = db): Promise<Backup> {
   const data = await readDataset(database);
+  const { profiilit, luonnokset, ...pohja } = data;
   return {
     schemaVersion: 1,
     appVersion: APP_VERSION,
     exportedAt: new Date().toISOString(),
     timezone: TIMEZONE,
     data: {
-      ...data,
+      ...pohja,
       photos: await Promise.all(
         data.photos.map(async ({ blob, ...p }) => ({
           ...p,
@@ -174,11 +176,14 @@ export async function restoreBackup(input: Backup, database: DiaryDB = db) {
       if (!valid) throw new Error("Varmuuskopion kuvan koko ei kelpaa.");
     }
   }
-  const data: Dataset = { ...b.data, photos };
+  // Paikalliset taulut (profiilit, luonnokset) ei palauteta varmuuskopiosta.
+  const data = { ...b.data, photos };
   await database.transaction("rw", database.tables, async () => {
     for (const table of tableNames) {
       await database.table(table).clear();
-      if (data[table].length) await database.table(table).bulkPut(data[table]);
+      if (table === "profiilit" || table === "luonnokset") continue;
+      const rivit = data[table as keyof typeof b.data];
+      if (rivit.length) await database.table(table).bulkPut(rivit);
     }
   });
 }

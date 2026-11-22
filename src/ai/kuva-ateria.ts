@@ -136,7 +136,7 @@ export function ateriaKuvasta(
   time: string,
   photo: Photo | null,
   lisatiedot = "",
-): Meal {
+): Omit<Meal, "profiiliId"> & { profiiliId?: string } {
   const d = tulos.draft;
   const oletukset: string[] = [];
   const vihje = siistiLisatiedot(lisatiedot);
@@ -152,6 +152,8 @@ export function ateriaKuvasta(
     ...stamped(),
     date,
     time,
+    // profiiliId puuttuu tarkoituksella: tallennus hoitaa aktiivisen profiilin
+    // tuntemisen, ja luonnos tulkitaan tallennettaessa.
     timestamp: wallTimestamp(date, time),
     timezone: TIMEZONE,
     type: ateriatyyppi(time),
@@ -183,7 +185,7 @@ const pyorista = (n: number) => Math.round(n * 10) / 10;
 const kentaksi = (n: number | null) =>
   n === null ? "" : String(pyorista(n)).replace(".", ",");
 
-export const luonnosRivit = (meal: Meal): LuonnosRivi[] =>
+export const luonnosRivit = (meal: Omit<Meal, "profiiliId"> & { profiiliId?: string }): LuonnosRivi[] =>
   meal.lines.map((l) => ({
     pohja: l,
     nimi: l.name,
@@ -254,11 +256,11 @@ export function luonnosSumma(rivit: LuonnosRivi[]): Totals | null {
 
 /** Tallennettava ateria: tyhjänimiset rivit jäävät pois, ateriatyyppi seuraa kelloa. */
 export function luonnosAteriaksi(
-  pohja: Meal,
+  pohja: Omit<Meal, "profiiliId"> & { profiiliId?: string },
   nimi: string,
   kello: string,
   rivit: LuonnosRivi[],
-): Meal {
+): Omit<Meal, "profiiliId"> & { profiiliId?: string } {
   const lines = rivit.filter((r) => r.nimi.trim()).map(riviksi);
   if (!lines.length) throw new Error("Lisää vähintään yksi ruoka.");
   return {
