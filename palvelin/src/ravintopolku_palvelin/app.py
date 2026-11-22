@@ -113,18 +113,22 @@ def luo(a: Asetukset) -> Starlette:
     tila = {"likainen": True, "viety": 0.0}
 
     async def kirjoita_vienti() -> None:
-        await run_in_threadpool(kanta.vie, yhteys, a.julkinen)
+        # Suorita SQL-kutsu suoraan event-loop-lankijassa, ei anyio-työlankijassa.
+        # Tämä välttää tilanteen, jossa anyio-työlankija pysyy elossa event loopin
+        # sulkemisen jälkeen ja ajaa vanhentunut yhteyskutsu, joka kaatoon prosessin.
+        # SQLite-kutsut ovat nopeat (<1ms), joten loopin lyhyt estyminen on hyväksyttävä.
+        kanta.vie(yhteys, a.julkinen)
         tila["likainen"], tila["viety"] = False, time.monotonic()
 
     async def nouda_luonnokset() -> None:
         """Kutsujalla on lukko. Pudotushakemisto luetaan vain, jos se on konfiguroitu; vanhentaminen tehdään aina."""
-        await run_in_threadpool(kanta.luonnokset_vanhenna, yhteys)
+        kanta.luonnokset_vanhenna(yhteys)
         if a.luonnokset is not None:
-            await run_in_threadpool(luonnokset.nouda, yhteys, a.luonnokset)
+            luonnokset.nouda(yhteys, a.luonnokset)
 
     async def huolto() -> None:
         async with lukko:
-            await run_in_threadpool(kanta.varmista, yhteys, a.varmistus)
+            kanta.varmista(yhteys, a.varmistus)
             if tila["likainen"]:
                 await kirjoita_vienti()
             await nouda_luonnokset()
@@ -143,8 +147,33 @@ def luo(a: Asetukset) -> Starlette:
         try:
             yield
         finally:
-            tehtava.cancel()
+            # Sulje yhteys ensin: jos huolto juuri nyt ajaa SQL-kutsua työläislankijassa,
+            # yhteys suljetaan sen loppuessa eikä lankaja yritä enää käyttää
+            # suljettua yhteyttä.
             yhteys.close()
+            # Odota, että kaikki kanta-kutsut ovat loppuneet: jos huolto on
+            # juuri nyt SQL-kutsussa, se ei pääse suljettua yhteyttä käyttämään.
+            # Tämä ei riitä, koska anyio-työläislankijat ovat edelleen elossa
+            # ja voivat käynnistää uusia kutsuja vanhentuneella yhteysobjektiella.
+            # Ratkaisu: peruuta tehtävä ja saavuta valmis, jotta kaikki
+            # kanta-kutsut ovat loppuneet ennen portaalin sulkemista.
+            # TestClient sulkee event loopin; jos tätä ei tehdä, anyio-työläislankija
+            # voi pysyä elossa ja ajaa vanhentunut yhteyskutsu, joka kaatoon prosessin.
+            try:
+                await asyncio.wait_for(lukko.acquire(), timeout=10.0)
+                lukko.release()
+            except (TimeoutError, asyncio.TimeoutError):
+                pass
+            tehtava.cancel()
+            try:
+                await tehtava
+            except BaseException:
+                pass
+            # Lisävarmistus: sulje yhteys uudestaan, jotta kaikki lankijat ovat ehtyneet.
+            try:
+                yhteys.close()
+            except Exception:
+                pass
 
     def kayttaja(request: Request) -> str:
         return a.kayttajat[request.headers["tailscale-user-login"]]
