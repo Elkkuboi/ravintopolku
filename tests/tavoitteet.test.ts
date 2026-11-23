@@ -296,7 +296,7 @@ describe("hyväksytty ehdotus tallentuu tavoitteeksi", () => {
 
   it("ilman voimassa olevaa tavoitetta tulee pelkän seurannan tavoite", () => {
     const goal = hyvaksyTavoite(arvot({ energy: null }), "2026-10-30");
-    expect(goalSchema.parse({ ...goal, profiiliId: "p1" })).toMatchObject({
+    expect(goalSchema.parse(goal)).toMatchObject({
       effectiveDate: "2026-10-30",
       kind: "track",
       targetWeight: null,
@@ -340,7 +340,7 @@ describe("tavoitelomake tallentaa tämän päivän tavoitteen", () => {
       "2026-11-19",
       laihdutus,
     );
-    expect(goalSchema.parse({ ...goal, profiiliId: "p1" })).toMatchObject({
+    expect(goalSchema.parse(goal)).toMatchObject({
       effectiveDate: "2026-11-19",
       kind: "lose",
       targetWeight: 76.5,
@@ -352,7 +352,7 @@ describe("tavoitelomake tallentaa tämän päivän tavoitteen", () => {
 
   it("tyhjä tavoitepaino tekee painotavoitteesta seurannan, muu tyyppi säilyy", () => {
     const seuranta = tavoiteLomakkeesta(arvot(), null, "2026-11-19", laihdutus);
-    expect(goalSchema.parse({ ...seuranta, profiiliId: "p1" })).toMatchObject({
+    expect(goalSchema.parse(seuranta)).toMatchObject({
       kind: "track",
       targetWeight: null,
       targetDate: null,
@@ -368,7 +368,7 @@ describe("tavoitelomake tallentaa tämän päivän tavoitteen", () => {
 
   it("ilman aiempaa tavoitetta: seuranta, tavoitepaino ilman päivää kelpaa", () => {
     const goal = tavoiteLomakkeesta(emptyNutrients(), 80, "2026-11-19");
-    expect(goalSchema.parse({ ...goal, profiiliId: "p1" })).toMatchObject({
+    expect(goalSchema.parse(goal)).toMatchObject({
       kind: "track",
       targetWeight: 80,
       targetDate: null,

@@ -18,15 +18,7 @@ export const line = (): MealLine => ({
   source: "Pakkaus",
   state: "kypsä",
 });
-
-// Profiili: testiä varten. Oletusprofiili "p1" on aktiivinen; toinen "p2" ei.
-export const profiili = (id = "p1", aktiivinen = true) => ({
-  id,
-  name: id,
-  aktiivinen,
-  luotu: "2026-01-01T00:00:00.000Z",
-});
-export const meal = (date = "2026-10-02", profiiliId = "p1"): Meal => {
+export const meal = (date = "2026-10-02"): Meal => {
   const lines = [line()];
   return {
     ...stamped(),
@@ -41,6 +33,5 @@ export const meal = (date = "2026-10-02", profiiliId = "p1"): Meal => {
     origin: "Käsin",
     assumptions: [],
     photoId: null,
-    profiiliId,
   };
 };

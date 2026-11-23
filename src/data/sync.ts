@@ -4,8 +4,7 @@
 // poistot. Palvelin antaa järjestyksen: viimeisin sille saapunut voittaa, myös saman päivän merkinnöissä, ja poistot
 // säilyvät. Laitteen kelloa ei käytetä. Valokuvat eivät synkronoidu (ADR-0016). Ilman palvelinta sovellus toimii
 // kuten ennenkin.
-import { db as oletusDb, type DiaryDB, getAPIAvain, listProfiilit, aktiivinenProfiiliId } from "./db";
-export { aktiivinenProfiiliId };
+import { db as oletusDb, type DiaryDB } from "./db";
 
 export const SYNKATTAVAT = [
   "profiles", "goals", "foods", "meals", "templates", "weights", "lifestyles", "days", "settings",
@@ -15,21 +14,8 @@ const LUONNOLLISET: Partial<Record<Taulu, string>> = {
   goals: "effectiveDate", weights: "date", lifestyles: "date", days: "date",
 };
 const ERA = 500;
+const SYNK_VERSIO = "single-diary-1";
 export const POISTOJEN_RAJA = 25;
-const PROFILIKENTTA = new Set(["meals", "templates", "weights", "lifestyles", "days", "goals", "foods"]);
-
-/** API-avain ja profiili-otsakkeet synkronoinnin pyyntöön. X-Profiili: palvelimen profiili-id;
- *  Authorization: Bearer <avain>, jos API-avain on asetettu. */
-export async function pyyntoOtsakkeet(database: DiaryDB = oletusDb): Promise<Record<string, string>> {
-  const otsakkeet: Record<string, string> = {};
-  const pid = await aktiivinenProfiiliId(database);
-  const lista = await listProfiilit(database);
-  const profiili = lista.find((p) => p.id === pid);
-  if (profiili?.serverId) otsakkeet["X-Profiili"] = profiili.serverId;
-  const avain = getAPIAvain();
-  if (avain) otsakkeet["Authorization"] = "Bearer " + avain;
-  return otsakkeet;
-}
 
 type Data = Record<string, unknown> & { id: string };
 export interface Muutos { taulu: Taulu; id: string; data: Data | null; poistettu: boolean }
@@ -49,29 +35,28 @@ export function vakaa(arvo: unknown): string {
   return JSON.stringify(arvo ?? null);
 }
 
+function yhdellePaivakirjalle(tietue: Data): Data {
+  const { profiiliId: _profileId, ...kirjaus } = tietue;
+  return kirjaus;
+}
+
 export async function paikallisetMuutokset(database: DiaryDB = oletusDb): Promise<Muutos[]> {
-  const pid = await aktiivinenProfiiliId(database);
   const pohja = new Map<string, string>();
-  for (const r of await database.table("synkPohja").toArray()) pohja.set(r.taulu + "\u0000" + r.id, r.json);
+  for (const r of await database.table("synkPohja").toArray()) {
+    pohja.set(r.taulu + "\u0000" + r.id, vakaa(yhdellePaivakirjalle(JSON.parse(r.json))));
+  }
   const muutokset: Muutos[] = [];
   for (const taulu of SYNKATTAVAT) {
     const nahdyt = new Set<string>();
-    const rivit = (await database.table(taulu).toArray()) as Data[];
-    // Profiilisuodatus: vain aktiivisen profiilin tietueet, ellei taululla ole profiiliId-kenttää.
-    const suodatet = PROFILIKENTTA.has(taulu)
-      ? rivit.filter((r) => r.profiiliId === pid)
-      : rivit;
-    for (const tietue of suodatet) {
+    for (const tietue of (await database.table(taulu).toArray()) as Data[]) {
       const avain = taulu + "\u0000" + tietue.id;
       nahdyt.add(avain);
-      if (pohja.get(avain) !== vakaa(tietue)) muutokset.push({ taulu, id: tietue.id, data: tietue, poistettu: false });
+      const data = yhdellePaivakirjalle(tietue);
+      if (pohja.get(avain) !== vakaa(data)) muutokset.push({ taulu, id: tietue.id, data, poistettu: false });
     }
-    // Poistot: pohjan rivit, joita ei enää löydy näkyvissä. Profiilikohtaisilla tauluilla
-    // vertaillaan vain profiilin omia rivit; ei-näkyville (toisen profiilin) ei läheta poistoa.
-    for (const avain of pohja.keys()) {
-      if (!avain.startsWith(taulu + "\u0000") || nahdyt.has(avain)) continue;
-      muutokset.push({ taulu, id: avain.slice(taulu.length + 1), data: null, poistettu: true });
-    }
+    for (const avain of pohja.keys())
+      if (avain.startsWith(taulu + "\u0000") && !nahdyt.has(avain))
+        muutokset.push({ taulu, id: avain.slice(taulu.length + 1), data: null, poistettu: true });
   }
   return muutokset;
 }
@@ -101,7 +86,7 @@ export async function sovellaEtamuutokset(muutokset: EtaMuutos[], seq: number, d
             await database.table("synkPohja").delete([m.taulu, v.id]);
           }
         }
-        await taulu.put(m.data);
+        await taulu.put(yhdellePaivakirjalle(m.data));
       }
     }
     await paivitaPohja(database, muutokset);
@@ -128,15 +113,13 @@ export async function synkronoi(
       return { tila: "vahvista-poistot", poistoja };
     let { seq } = await synkTila(database);
     let vastaanotettu = 0;
-    // Profiili ja API-avain: X-Profiili + Authorization-otsakkeet.
-    const otsakkeet = await pyyntoOtsakkeet(database);
     // Sivuilla siirretään muutoksia, mutta enintään 20 sivua kerrallaan: loput lähtevät seuraavalla synkronoinnilla.
     for (let i = 0, sivut = 0; i === 0 || (i < muutokset.length && sivut < 20); i += ERA, sivut++) {
       const era = muutokset.slice(i, i + ERA);
       const r = await hae("/api/synk", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json", ...otsakkeet },
+        headers: { "Content-Type": "application/json", "X-Ravintopolku-Sync": SYNK_VERSIO },
         body: JSON.stringify({ jalkeen: seq, muutokset: era }),
       });
       if (r.status === 404) return { tila: "ei-palvelinta" };
@@ -148,7 +131,7 @@ export async function synkronoi(
       seq = (await synkTila(database)).seq;
       let lisaa = vastaus.lisaa;
       while (lisaa) {
-        const s = await hae(`/api/synk?jalkeen=${seq}`, { credentials: "same-origin", headers: otsakkeet });
+        const s = await hae(`/api/synk?jalkeen=${seq}`, { credentials: "same-origin" });
         if (!s.ok) return { tila: "virhe", viesti: `palvelin vastasi ${s.status}` };
         const sivu = await s.json();
         await sovellaEtamuutokset(sivu.muutokset, sivu.lisaa ? (sivu.muutokset.at(-1)?.seq ?? seq) : sivu.seq, database);

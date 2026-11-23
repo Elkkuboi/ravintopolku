@@ -87,26 +87,25 @@ describe("Painon tallennus on koodin vastuulla", () => {
         date: "2026-10-02",
         kg: 82.44,
         note: "",
-        profiiliId: "p1",
       }).kg,
     ).toBe(82.4);
     const db = kanta();
-    await saveRecord("weights", { ...mittaus("2026-10-02", 82.46), profiiliId: "p1" }, db);
+    await saveRecord("weights", mittaus("2026-10-02", 82.46), db);
     expect((await findWeight("2026-10-02", db))?.kg).toBe(82.5);
     for (const kg of [9.9, 501])
       expect(() =>
-        weightSchema.parse({ ...stamped(), date: "2026-10-02", kg, note: "", profiiliId: "p1" }),
+        weightSchema.parse({ ...stamped(), date: "2026-10-02", kg, note: "" }),
       ).toThrow();
   });
   it("saman päivän uusi arvo korvaa edellisen: yksi rivi päivää kohti", async () => {
     const db = kanta();
     expect(await findWeight("2026-10-02", db)).toBeUndefined();
-    await saveRecord("weights", { ...mittaus("2026-10-02", 82.4, "w1"), profiiliId: "p1" }, db);
+    await saveRecord("weights", mittaus("2026-10-02", 82.4, "w1"), db);
     // Samoin kuin kirjauksessa: olemassa oleva rivi päivitetään, ei lisätä.
     const olemassa = await findWeight("2026-10-02", db);
     await saveRecord(
       "weights",
-      { ...stamped(olemassa), date: "2026-10-02", kg: 81.9, note: "", profiiliId: "p1" },
+      { ...stamped(olemassa), date: "2026-10-02", kg: 81.9, note: "" },
       db,
     );
     expect(await db.weights.count()).toBe(1);
@@ -116,7 +115,7 @@ describe("Painon tallennus on koodin vastuulla", () => {
     const db = kanta();
     await saveRecord(
       "days",
-      { ...stamped(), date: "2026-10-02", complete: true, profiiliId: "p1" },
+      { ...stamped(), date: "2026-10-02", complete: true },
       db,
     );
     const data = await readDataset(db);
@@ -212,8 +211,7 @@ describe("Paino synkronoituu kuten muut kirjaukset", () => {
   it("paino on synkätty taulu ja paikallinen muutos lähtee palvelimelle", async () => {
     expect(SYNKATTAVAT).toContain("weights");
     const db = kanta();
-    await db.table("profiilit").put({ id: "p1", name: "p1", aktiivinen: true, luotu: "2026-01-01T00:00:00.000Z" });
-    await saveRecord("weights", { ...mittaus("2026-10-02", 82.4, "w1"), profiiliId: "p1" }, db);
+    await saveRecord("weights", mittaus("2026-10-02", 82.4, "w1"), db);
     const muutokset = await paikallisetMuutokset(db);
     expect(muutokset.map((m) => [m.taulu, m.id, m.poistettu])).toEqual([
       ["weights", "w1", false],
@@ -225,13 +223,12 @@ describe("Paino synkronoituu kuten muut kirjaukset", () => {
   });
   it("palvelimen saman päivän mittaus voittaa ja poistaa vanhan", async () => {
     const db = kanta();
-    await db.table("profiilit").put({ id: "p1", name: "p1", aktiivinen: true, luotu: "2026-01-01T00:00:00.000Z" });
-    await saveRecord("weights", { ...mittaus("2026-10-02", 82.4, "w1"), profiiliId: "p1" }, db);
+    await saveRecord("weights", mittaus("2026-10-02", 82.4, "w1"), db);
     const etämuutos: EtaMuutos = {
       seq: 1,
       taulu: "weights",
       id: "w2",
-      data: { ...mittaus("2026-10-02", 81.9, "w2"), profiiliId: "p1" },
+      data: mittaus("2026-10-02", 81.9, "w2"),
       poistettu: false,
     };
     await sovellaEtamuutokset([etämuutos], 1, db);
