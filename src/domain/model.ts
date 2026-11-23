@@ -56,6 +56,8 @@ export const profileSchema = z
   })
   .strict();
 export type Profile = z.infer<typeof profileSchema>;
+// Copies made during the profile preview can contain this unused local identifier.
+const legacyDiary = { profiiliId: z.string().min(1).optional() };
 export const goalSchema = z
   .object({
     ...stamp,
@@ -64,7 +66,7 @@ export const goalSchema = z
     targetWeight: z.number().min(10).max(500).nullable(),
     targetDate: daySchema.nullable(),
     nutrients: nutrientsSchema,
-    profiiliId: z.string().min(1),
+    ...legacyDiary,
   })
   .strict()
   .superRefine((g, c) => {
@@ -86,7 +88,7 @@ export const foodSchema = z
     source: z.string().min(1).max(500),
     per100: nutrientsSchema,
     favorite: z.boolean(),
-    profiiliId: z.string().min(1),
+    ...legacyDiary,
   })
   .strict();
 export type Food = z.infer<typeof foodSchema>;
@@ -128,7 +130,7 @@ export const mealSchema = z
     origin: z.string().min(1).max(500),
     assumptions: z.array(text).max(302),
     photoId: z.string().nullable(),
-    profiiliId: z.string().min(1),
+    ...legacyDiary,
   })
   .strict();
 export type Meal = z.infer<typeof mealSchema>;
@@ -138,7 +140,7 @@ export const templateSchema = z
     name: z.string().min(1).max(200),
     lines: z.array(lineSchema).min(1).max(100),
     type: mealSchema.shape.type,
-    profiiliId: z.string().min(1),
+    ...legacyDiary,
   })
   .strict();
 export type MealTemplate = z.infer<typeof templateSchema>;
@@ -154,7 +156,7 @@ export const weightSchema = z
     date: daySchema,
     kg: z.number().min(PAINO_MIN).max(PAINO_MAX).transform(pyöristäPaino),
     note: text,
-    profiiliId: z.string().min(1),
+    ...legacyDiary,
   })
   .strict();
 export type Weight = z.infer<typeof weightSchema>;
@@ -167,12 +169,12 @@ export const lifestyleSchema = z
     training: text,
     hunger: z.number().int().min(1).max(5).nullable(),
     energy: z.number().int().min(1).max(5).nullable(),
-    profiiliId: z.string().min(1),
+    ...legacyDiary,
   })
   .strict();
 export type Lifestyle = z.infer<typeof lifestyleSchema>;
 export const dayStatusSchema = z
-  .object({ ...stamp, date: daySchema, complete: z.boolean(), profiiliId: z.string().min(1) })
+  .object({ ...stamp, date: daySchema, complete: z.boolean(), ...legacyDiary })
   .strict();
 export type DayStatus = z.infer<typeof dayStatusSchema>;
 // kuvantulkinta: Kuvasta ateria -toiminnon rooli aiops-välittäjälle (ADR-0027); puuttuva = kuva_tulkki (Hubin valinta).
@@ -194,30 +196,6 @@ export const settingsSchema = z
   })
   .strict();
 export type Settings = z.infer<typeof settingsSchema>;
-// Profiili (käyttäjätili), jonka tietoa Ravintopolku-palvelin erottaa muista:
-// profiilivalinta ja API-avain. id on paikallinen tunnus; serverId on palvelimen
-// profiili-id, kun se on synkroinnut.
-export const profiiliSkeema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1).max(100),
-    serverId: z.string().min(1).max(200).optional(),
-    aktiivinen: z.boolean(),
-    luotu: z.iso.datetime(),
-  })
-  .strict();
-export type Profiili = z.infer<typeof profiiliSkeema>;
-
-// Aterian luonnos (esimerkiksi kuvan tulkintapalvelimen tulos), jota ei ole vielä
-// tallennettu. Paikallinen taulu luonnokset; profiiliId erottaa luonnokset käyttäjän
-// mukaan.
-export interface Luonnos {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  data: unknown;
-  profiiliId: string;
-}
 export interface Photo {
   id: string;
   createdAt: string;
@@ -225,8 +203,6 @@ export interface Photo {
   blob: Blob;
 }
 export interface Dataset {
-  profiilit: Profiili[];
-  luonnokset: Luonnos[];
   profiles: Profile[];
   goals: Goal[];
   foods: Food[];
@@ -239,8 +215,6 @@ export interface Dataset {
   photos: Photo[];
 }
 export const emptyDataset = (): Dataset => ({
-  profiilit: [],
-  luonnokset: [],
   profiles: [],
   goals: [],
   foods: [],

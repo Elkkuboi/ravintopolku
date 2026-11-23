@@ -35,6 +35,7 @@ from . import ateria_kuvaus, kanta, kuva, luonnokset, tavoitteet
 from .config import PORTTI, Asetukset
 
 PYYNTO_MAX = 1024 * 1024
+SYNK_VERSIO = "single-diary-1"
 KUVAPYYNTO_MAX = kuva.KUVA_MAX + 64 * 1024  # kuva ja lomakekentät multipart-kuorineen
 KUVAKUTSUJA_MAX = 2  # samanaikaisia välittäjäkutsuja
 VIENTI_VALI_S = 60.0  # julkinen kopio enintään kerran minuutissa
@@ -113,22 +114,18 @@ def luo(a: Asetukset) -> Starlette:
     tila = {"likainen": True, "viety": 0.0}
 
     async def kirjoita_vienti() -> None:
-        # Suorita SQL-kutsu suoraan event-loop-lankijassa, ei anyio-työlankijassa.
-        # Tämä välttää tilanteen, jossa anyio-työlankija pysyy elossa event loopin
-        # sulkemisen jälkeen ja ajaa vanhentunut yhteyskutsu, joka kaatoon prosessin.
-        # SQLite-kutsut ovat nopeat (<1ms), joten loopin lyhyt estyminen on hyväksyttävä.
-        kanta.vie(yhteys, a.julkinen)
+        await run_in_threadpool(kanta.vie, yhteys, a.julkinen)
         tila["likainen"], tila["viety"] = False, time.monotonic()
 
     async def nouda_luonnokset() -> None:
         """Kutsujalla on lukko. Pudotushakemisto luetaan vain, jos se on konfiguroitu; vanhentaminen tehdään aina."""
-        kanta.luonnokset_vanhenna(yhteys)
+        await run_in_threadpool(kanta.luonnokset_vanhenna, yhteys)
         if a.luonnokset is not None:
-            luonnokset.nouda(yhteys, a.luonnokset)
+            await run_in_threadpool(luonnokset.nouda, yhteys, a.luonnokset)
 
     async def huolto() -> None:
         async with lukko:
-            kanta.varmista(yhteys, a.varmistus)
+            await run_in_threadpool(kanta.varmista, yhteys, a.varmistus)
             if tila["likainen"]:
                 await kirjoita_vienti()
             await nouda_luonnokset()
@@ -147,46 +144,22 @@ def luo(a: Asetukset) -> Starlette:
         try:
             yield
         finally:
-            # Sulje yhteys ensin: jos huolto juuri nyt ajaa SQL-kutsua työläislankijassa,
-            # yhteys suljetaan sen loppuessa eikä lankaja yritä enää käyttää
-            # suljettua yhteyttä.
-            yhteys.close()
-            # Odota, että kaikki kanta-kutsut ovat loppuneet: jos huolto on
-            # juuri nyt SQL-kutsussa, se ei pääse suljettua yhteyttä käyttämään.
-            # Tämä ei riitä, koska anyio-työläislankijat ovat edelleen elossa
-            # ja voivat käynnistää uusia kutsuja vanhentuneella yhteysobjektiella.
-            # Ratkaisu: peruuta tehtävä ja saavuta valmis, jotta kaikki
-            # kanta-kutsut ovat loppuneet ennen portaalin sulkemista.
-            # TestClient sulkee event loopin; jos tätä ei tehdä, anyio-työläislankija
-            # voi pysyä elossa ja ajaa vanhentunut yhteyskutsu, joka kaatoon prosessin.
+            # Drain in-flight maintenance before closing SQLite. Cancelling an await
+            # does not stop a database operation already running in a worker thread.
+            async with lukko:
+                tehtava.cancel()
             try:
-                await asyncio.wait_for(lukko.acquire(), timeout=10.0)
-                lukko.release()
-            except (TimeoutError, asyncio.TimeoutError):
-                pass
-            tehtava.cancel()
-            try:
-                await tehtava
-            except BaseException:
-                pass
-            # Lisävarmistus: sulje yhteys uudestaan, jotta kaikki lankijat ovat ehtyneet.
-            try:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await tehtava
+            finally:
                 yhteys.close()
-            except Exception:
-                pass
 
     def kayttaja(request: Request) -> str:
         return a.kayttajat[request.headers["tailscale-user-login"]]
 
-    def omistus(request: Request) -> tuple[int, int]:
-        """Migraation oletusomistus (kayttaja_id, profiili_id) = (1, 1); API ei vielä tunne käyttäjä- tai
-        profiiliparametreja, joten kaikki pyynnöt kirjoitetaan ja luetaan oletusomistajana."""
-        return 1, 1
-
     async def api_tila(request: Request) -> Response:
-        k, p = omistus(request)
         async with lukko:
-            t = await run_in_threadpool(kanta.tilasto, yhteys, k, p)
+            t = await run_in_threadpool(kanta.tilasto, yhteys)
         return JSONResponse({**t, "kayttaja": kayttaja(request)})
 
     async def api_hae(request: Request) -> Response:
@@ -194,11 +167,10 @@ def luo(a: Asetukset) -> Starlette:
             jalkeen = int(request.query_params.get("jalkeen", "0"))
         except ValueError:
             return JSONResponse({"virhe": "jalkeen: kokonaisluku"}, status_code=400)
-        k, p = omistus(request)
         try:
             async with lukko:
-                muutokset, lisaa = await run_in_threadpool(kanta.hae, yhteys, jalkeen, None, k, p)
-                seq = await run_in_threadpool(kanta.suurin_seq, yhteys, k, p)
+                muutokset, lisaa = await run_in_threadpool(kanta.hae, yhteys, jalkeen)
+                seq = await run_in_threadpool(kanta.suurin_seq, yhteys)
         except kanta.Hylatty as e:
             return JSONResponse({"virhe": str(e)}, status_code=400)
         return JSONResponse({"muutokset": muutokset, "lisaa": lisaa, "seq": seq})
@@ -217,14 +189,18 @@ def luo(a: Asetukset) -> Starlette:
             return JSONResponse({"virhe": "runko ei ole JSONia"}, status_code=400)
         if not isinstance(data, dict) or set(data) - {"jalkeen", "muutokset"}:
             return JSONResponse({"virhe": "runko: olio, jossa jalkeen ja muutokset"}, status_code=400)
+        lahetetyt = data.get("muutokset", [])
+        if lahetetyt and request.headers.get("x-ravintopolku-sync") != SYNK_VERSIO:
+            # Cached builds can mistake invisible records for deletions. They may
+            # still pull changes, but must update before sending any writes.
+            return JSONResponse({"virhe": "Päivitä Ravintopolku ennen synkronointia."}, status_code=409)
         laite = f"{kayttaja(request)}@{request.headers.get('x-forwarded-for', '?')[:64]}"
-        k, p = omistus(request)
         try:
+            jalkeen = kanta.tarkista_jalkeen(data.get("jalkeen", 0))
             async with lukko:
-                kuitatut = await run_in_threadpool(kanta.sovella, yhteys, data.get("muutokset", []), laite,
-                                                  None, k, p)
-                muutokset, lisaa = await run_in_threadpool(kanta.hae, yhteys, data.get("jalkeen", 0), None, k, p)
-                seq = await run_in_threadpool(kanta.suurin_seq, yhteys, k, p)
+                kuitatut = await run_in_threadpool(kanta.sovella, yhteys, lahetetyt, laite)
+                muutokset, lisaa = await run_in_threadpool(kanta.hae, yhteys, jalkeen)
+                seq = await run_in_threadpool(kanta.suurin_seq, yhteys)
                 if kuitatut:
                     tila["likainen"] = True
                     if time.monotonic() - tila["viety"] >= VIENTI_VALI_S:  # muuten huoltosilmukka vie myöhemmin
@@ -234,10 +210,9 @@ def luo(a: Asetukset) -> Starlette:
         return JSONResponse({"kuitatut": kuitatut, "muutokset": muutokset, "lisaa": lisaa, "seq": seq})
 
     async def api_luonnokset(request: Request) -> Response:
-        k, p = omistus(request)
         async with lukko:
             await nouda_luonnokset()
-            odottavat = await run_in_threadpool(kanta.luonnokset_odottavat, yhteys, k, p)
+            odottavat = await run_in_threadpool(kanta.luonnokset_odottavat, yhteys)
         return JSONResponse({"luonnokset": odottavat})
 
     async def api_luonnos_valmis(request: Request) -> Response:

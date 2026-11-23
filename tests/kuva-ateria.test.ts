@@ -386,7 +386,7 @@ describe("ateriaKuvasta", () => {
   it("luo tallentamattoman kelvollisen aterian: alkuperä yhtenä rivinä, oletukset ilman toistoa, 100 g per100-riville", async () => {
     const photo = { ...stamped(), blob: kuva };
     const meal = ateriaKuvasta(tulos, "2026-10-28", "12:30", photo);
-    expect(() => mealSchema.parse({ ...meal, profiiliId: "p1" })).not.toThrow();
+    expect(() => mealSchema.parse(meal)).not.toThrow();
     expect(meal.type).toBe("Lounas");
     expect(meal.origin).toBe("Kuvasta (gpt-testi): ruoka-annos");
     expect(meal.note).toBe("Lihapullat ja muusi");
@@ -536,7 +536,7 @@ describe("luonnoksen tarkistus: ruoka / g / kcal", () => {
       { ...uusiRivi(), nimi: "" },
     ];
     const meal = luonnosAteriaksi(pohja, " Lihapullat ", "08:15", r);
-    expect(() => mealSchema.parse({ ...meal, profiiliId: "p1" })).not.toThrow();
+    expect(() => mealSchema.parse(meal)).not.toThrow();
     expect(meal.lines.map((l) => l.name)).toEqual(["Lihapullat"]);
     expect(meal.time).toBe("08:15");
     expect(meal.type).toBe("Aamiainen");

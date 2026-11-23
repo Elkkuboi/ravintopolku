@@ -16,7 +16,6 @@ import {
   type NakymaProps,
 } from "./kuori";
 import Tanaan from "./nakymat/Tanaan";
-import { ProfiiliValinta } from "./components/ProfiiliValinta";
 const Kehitys = lazy(() => import("./nakymat/Kehitys"));
 const Asetukset = lazy(() => import("./nakymat/Asetukset"));
 
@@ -105,7 +104,6 @@ export default function App() {
               </a>
             ))}
           </nav>
-          <ProfiiliValinta notify={notify} run={run} />
         </div>
       </header>
       {needRefresh && (
