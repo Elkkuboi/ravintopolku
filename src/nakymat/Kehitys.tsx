@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { type NakymaProps } from "../kuori";
 import { localDay } from "../domain/dates";
-import { formatNumber } from "../domain/nutrition";
+import { formatNumber, tavoitealue } from "../domain/nutrition";
 import { Pylvaskuvaaja, Viivakuvaaja } from "../components/Kuvaaja";
 import {
   elatiivi,
@@ -43,6 +43,8 @@ export default function Kehitys({ data }: NakymaProps) {
   );
   const [energia, proteiini] = makrot;
   const treeniJaksolla = treeniYhteenveto(data, end, energia.points);
+  // Sama tavoitealue kuin Tänään-sivun mittarissa: proteiini on "vähintään", alaraja 90 % tavoitteesta.
+  const proteiiniAlue = tavoitealue(proteiini.key, proteiini.goal);
   const viikoittain = viikkoPylvaina(paivia);
   const pylvaat = viikoittain
     ? viikkoPylvaat(data, end, energia.points)
@@ -134,10 +136,10 @@ export default function Kehitys({ data }: NakymaProps) {
         {!proteiini.hasData ? (
           <p className="empty">Ei kirjauksia tällä jaksolla.</p>
         ) : (
-          proteiini.goal !== null && (
+          proteiiniAlue && (
             <p className="muted">
               {tavoiteLause(
-                tavoitePaivat(data, end, proteiini.points, proteiini.goal),
+                tavoitePaivat(data, end, proteiini.points, proteiiniAlue),
               )}
             </p>
           )

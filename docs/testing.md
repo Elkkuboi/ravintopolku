@@ -25,6 +25,9 @@ saa tarvita verkkoa. Asennus ei aja Playwrightia eikä pytestiä: aja ne itse en
   kuva lähtee aina roolilla `kuva_tulkki` tallennetuista asetuksista riippumatta, virheteksti HTTP-tilasta ilman
   palvelimen tekstiä, luonnoksen muokkaus ja tallennus, aterian muokkaus säilyttää piilotetut kentät.
 - Kehitys: asteikon laskenta, jakso, keskiarvo, tavoitepäivät, viikkopylväät ja sivun piirto.
+- Tavoitealue (`tests/tavoitealue.test.ts`): säännön rajat molempiin suuntiin (raja kuuluu alueeseen, yksikkö sen
+  ulkopuolella ei), pyöristys näytetyn luvun mukaan, osittainen summa alarajana, mittarin asteikko, tekstit ja
+  piirto viidessä tilassa (tyhjä, alle, alueella, yli, osittainen) sekä nollatavoite ilman aluetta.
 - Treenipäivä (`tests/treenipaiva.test.ts`): vanha kirjaus ilman kenttää kelpaa, napautus ja lomake eivät kumoa
   toisiaan, synkronoitu kirjaus päivitetään, varmuuskopio ja synkronointi kuljettavat kentän, Kehityksen viivat,
   lause ja sarake sekä tämän päivän keskeneräinen päivä keskiarvon ulkopuolella.
@@ -44,6 +47,8 @@ Testi tarkistaa:
 
 - kolme sivua aukeavat neljällä värillä ilman CSP-rikkeitä ja konsolivirheitä, ja `theme-color` seuraa väriä
 - käsin kirjaus näkyy päivän summassa ja ateria aukeaa muokattavaksi
+- tavoitealue: tavoitteen tallennus Asetuksissa, palkin pääty ja tavoitteen merkki oikeissa kohdissa (leveydet
+  tulevat tuotannon CSP:n alla), alueelle osunut luku vaihtaa väriä ja ylitys varoittaa
 - treenipäivä tallentuu napautuksesta selaimen kantaan samaan kirjaukseen lomakkeen kanssa, ei tyhjennä kesken olevaa
   lomaketta ja näkyy Kehityksessä (viiva 30 päivän kuvaajassa, ei viikkopylväissä, sarake T, lause)
 - kamera ja galleria ovat erilliset kentät, `capture` on vain kamerassa ja kohdistuskehys näkyy vain näppäimistöllä

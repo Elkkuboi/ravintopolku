@@ -275,6 +275,81 @@ test("treenipäivä: napautus tallentuu heti, ei tyhjennä lomaketta ja näkyy K
   expect(virheet).toEqual([]);
 });
 
+test("tavoitealue: palkin pääty ja tavoitteen merkki näkyvät, alueelle osunut luku vihertää, ylitys varoittaa", async ({
+  page,
+}) => {
+  const virheet = await valvo(page);
+  await palvelin(page);
+  await page.goto("/#asetukset");
+  // tavoite 380 kcal: alue 342–418
+  await page.getByLabel("Energia kcal").fill("380");
+  await page
+    .locator("form.lomake")
+    .getByRole("button", { name: "Tallenna" })
+    .click();
+  await expect(page.getByText("Tavoitteet tallennettu.")).toBeVisible();
+  await page.getByRole("link", { name: "Tänään" }).click();
+  const kirjaa = async (nimi: string, kcal: string) => {
+    await page.getByRole("button", { name: "Kirjoita", exact: true }).click();
+    await page.getByLabel(/^1\. /).fill(nimi);
+    await page.getByLabel("Energia (kcal)").fill(kcal);
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Tallenna" })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  };
+  const luku = page.locator(".figure-num"),
+    mittari = page.getByRole("meter", { name: "Energia tavoitteesta" });
+  const vari = () => luku.evaluate((e) => getComputedStyle(e).color);
+
+  await expect(page.locator(".label .aside").first()).toHaveText(
+    "tavoite 380 (342–418) kcal",
+  );
+  await kirjaa("Puuro", "200");
+  await expect(luku).toHaveText("200");
+  await expect(luku).not.toHaveClass(/osui/);
+  const tavallinen = await vari();
+  // alue on palkin pääty ja tavoitteen merkki sen sisällä (leveydet tulevat CSSOM:sta, CSP ei estä niitä)
+  const laatikko = async (luokka: string) =>
+    (await mittari.locator(luokka).boundingBox())!;
+  const palkki = (await mittari.boundingBox())!,
+    alue = await laatikko(".meter-alue"),
+    merkki = await laatikko(".meter-tavoite"),
+    taytto = await laatikko(".meter-taytto");
+  expect(alue.width).toBeGreaterThan(palkki.width * 0.15);
+  expect(alue.width).toBeLessThan(palkki.width * 0.25);
+  expect(alue.x + alue.width).toBeGreaterThan(palkki.x + palkki.width - 3);
+  expect(merkki.x).toBeGreaterThan(alue.x);
+  expect(merkki.x).toBeLessThan(alue.x + alue.width);
+  expect(taytto.width).toBeGreaterThan(palkki.width * 0.4);
+  expect(taytto.width).toBeLessThan(alue.x - palkki.x);
+  await expect(mittari.locator(".meter-osuma")).toHaveCount(0);
+
+  await kirjaa("Leipä", "150");
+  await expect(luku).toHaveText("350");
+  await expect(luku).toHaveClass(/osui/);
+  expect(await vari()).not.toBe(tavallinen);
+  await expect(page.locator(".figure-of")).toHaveText("30 jäljellä");
+  await expect(page.locator(".figure-of")).toHaveClass(/osui/);
+  await expect(mittari.locator(".meter-osuma")).toHaveCount(1);
+  await expect(mittari).toHaveAttribute(
+    "aria-valuetext",
+    "350 kcal, tavoite 380 kcal, tavoitealueella",
+  );
+  await expect(mittari).not.toHaveClass(/meter--over/);
+
+  await kirjaa("Jälkiruoka", "100");
+  await expect(luku).toHaveText("450");
+  await expect(luku).not.toHaveClass(/osui/);
+  expect(await vari()).toBe(tavallinen);
+  await expect(page.locator(".figure-of")).toHaveText("yli 70");
+  await expect(page.locator(".figure-of")).toHaveClass(/yli/);
+  await expect(mittari).toHaveClass(/meter--over/);
+  await expect(mittari.locator(".meter-osuma")).toHaveCount(0);
+  expect(virheet).toEqual([]);
+});
+
 test("kuvakentät: kamera ja galleria erikseen, capture vain kamerassa", async ({
   page,
 }) => {
