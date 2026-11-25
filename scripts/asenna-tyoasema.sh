@@ -34,8 +34,10 @@
 #     /etc/ravintopolku/palvelin.toml vielä kerro sitä, [palvelin]-tauluun lisätään rivi
 #     valittaja = "/run/aiops-valittaja/valittaja.sock" (kuvasta ateria, aiops ADR-0025/-0027). Rivi lisätään vain
 #     kerran, kaikki tai ei mitään (TOML jäsennetään ennen tallennusta); peruminen: poista rivi ja käynnistä palvelu.
+#     Keskeytys (Ctrl-C, katkennut SSH-yhteys) palauttaa samoin, eikä toinen keskeytys katkaise palautusta. Jos
+#     edellisen ajon varakopio (dist.vanha tai palvelin.vanha) on yhä olemassa, skripti pysähtyy eikä poista sitä.
 #   - Testit: palvelin/tests/test_asennus.py ajaa tämän skriptin väliaikaisessa juuressa (onnistunut asennus, paluu
-#     virheestä, --vain-sovellus, puuttuva Python).
+#     virheestä ja keskeytyksestä, --vain-sovellus, puuttuva Python).
 # =====================================================================
 set -euo pipefail
 
@@ -70,6 +72,11 @@ else
   [ -x "$PYTHON" ] || { echo "Palvelin tarvitsee koneen oman Pythonin $PYTHON, jota ei ole. Mitään ei muutettu. Pelkkä sovellus: --vain-sovellus." >&2; exit 1; }
 fi
 getent passwd ravintopolku >/dev/null || { echo "Käyttäjää ravintopolku ei ole (aiops-muutosloki, vaihe R2)." >&2; exit 1; }
+for JAANNE in "$TARGET/dist.vanha" "$TARGET/palvelin.vanha"; do
+  # Varakopio on olemassa vain, jos edellinen ajo katkesi kesken paluun (virtakatko, SIGKILL). Se voi olla ainoa ehjä
+  # kopio edellisestä versiosta, joten sitä ei poisteta eikä sen päälle asenneta.
+  [ ! -e "$JAANNE" ] || { echo "Edellinen asennus jäi kesken: $JAANNE on olemassa. Mitään ei muutettu. Palauta edellinen versio (sudo rm -rf ${JAANNE%.vanha} && sudo mv $JAANNE ${JAANNE%.vanha} && sudo systemctl restart $UNIT) tai poista varakopio, ja aja asennus uudelleen." >&2; exit 1; }
+done
 if [ -n "$("${GIT[@]}" status --porcelain)" ]; then
   echo "Repossa on tallentamattomia muutoksia. Commitoi ensin: asennetaan vain commitoitu koodi." >&2
   "${GIT[@]}" status --short >&2
@@ -89,6 +96,9 @@ palauta() {
   # Kesken jäänyt asennus: edellinen versio takaisin. Jokainen askel on turvallinen myös, jos vaihtoa ei ehditty tehdä.
   set +e
   echo "VIRHE: asennus keskeytyi. Palautetaan edellinen versio." >&2
+  # Uusi versio on voinut jo käynnistyä: se pysäytetään, ennen kuin tiedostot vaihdetaan takaisin sen alta. Käynnissä
+  # olevalle palvelulle "systemctl start" ei tee mitään, joten ilman pysäytystä uusi prosessi jäisi pyörimään.
+  if [ "$OLI_KAYNNISSA" -eq 1 ]; then systemctl stop "$UNIT"; fi
   if [ -e "$TARGET/dist.vanha" ]; then rm -rf "$TARGET/dist"; mv "$TARGET/dist.vanha" "$TARGET/dist"; fi
   rm -rf "$TARGET/dist.uusi"
   if [ -e "$TARGET/palvelin.vanha" ]; then rm -rf "$TARGET/palvelin"; mv "$TARGET/palvelin.vanha" "$TARGET/palvelin"; fi
@@ -107,6 +117,7 @@ palauta() {
 }
 lopuksi() {
   local koodi=$?
+  trap '' INT TERM HUP   # palautus ajetaan aina loppuun: toinenkaan Ctrl-C ei katkaise sitä
   [ "$VAIHE" -ne 1 ] || palauta
   rm -rf "$STAGE" "$VARA"
   exit "$koodi"
@@ -139,7 +150,7 @@ done
 
 # --- Sovellus --------------------------------------------------------------------------------------------------
 install -d -o root -g root -m 0755 "$TARGET"
-rm -rf "$TARGET/dist.uusi" "$TARGET/dist.vanha" "$TARGET/palvelin.vanha"
+rm -rf "$TARGET/dist.uusi"
 cp -r "$STAGE/dist" "$TARGET/dist.uusi"
 chown -R root:root "$TARGET/dist.uusi"
 chmod -R u=rwX,go=rX "$TARGET/dist.uusi"

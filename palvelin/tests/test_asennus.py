@@ -11,7 +11,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
+import time
 
 import pytest
 
@@ -22,7 +24,8 @@ VALEKOMENNOT = {
     "id": '#!/bin/sh\nif [ "$1" = "-u" ]; then echo 0; else exec /usr/bin/id "$@"; fi\n',
     "getent": "#!/bin/sh\nexit 0\n",
     "chown": "#!/bin/sh\nexit 0\n",
-    "sleep": "#!/bin/sh\nexit 0\n",
+    # Odotukset ohitetaan, paitsi kun testi haluaa aikaa lähettää signaalin (OIKEA_UNI).
+    "sleep": '#!/bin/sh\n[ -z "${OIKEA_UNI:-}" ] || exec /usr/bin/sleep "$@"\nexit 0\n',
     "install": """#!/usr/bin/env bash
 a=(); while [ $# -gt 0 ]; do case "$1" in -o|-g) shift 2;; *) a+=("$1"); shift;; esac; done
 exec /usr/bin/install "${a[@]}"
@@ -46,16 +49,21 @@ case "$1" in
   is-active) [ -f "$TILA/aktiivinen" ] ;;
   stop) rm -f "$TILA/aktiivinen" "$ajo/palvelin.sock" ;;
   start)
+    # Kuten systemd: käynnissä olevalle palvelulle start ei tee mitään (prosessi ja sen versio pysyvät).
+    [ ! -f "$TILA/aktiivinen" ] || exit 0
+    [ -z "${HIDAS_KAYNNISTYS:-}" ] || /usr/bin/sleep "$HIDAS_KAYNNISTYS"
+    versio=vanha; [ ! -f "$VALEJUURI/opt/ravintopolku/palvelin/uusi" ] || versio=uusi
     # Testi voi määrätä, ettei uusi palvelin pysy käynnissä; edellinen käynnistyy aina.
-    if [ -n "${UUSI_EI_KAYNNISTY:-}" ] && [ -f "$VALEJUURI/opt/ravintopolku/palvelin/uusi" ]; then exit 0; fi
+    if [ -n "${UUSI_EI_KAYNNISTY:-}" ] && [ "$versio" = uusi ]; then exit 0; fi
     mkdir -p "$ajo"
     (cd "$ajo" && python3 -c 'import socket; socket.socket(socket.AF_UNIX).bind("palvelin.sock")')
-    touch "$TILA/aktiivinen" ;;
+    echo "$versio" > "$TILA/aktiivinen" ;;
 esac
 """,
     "uv": """#!/usr/bin/env bash
 echo "uv $* lataus=${UV_PYTHON_DOWNLOADS:-}" >> "$LOKI"
 [ -z "${UV_PETTAA:-}" ] || exit 1
+[ -z "${HIDAS_UV:-}" ] || /usr/bin/sleep "$HIDAS_UV"
 mkdir -p .venv/bin
 printf '#!/bin/sh\\nexit 0\\n' > .venv/bin/ravintopolku-palvelin
 chmod +x .venv/bin/ravintopolku-palvelin
@@ -107,16 +115,30 @@ class Kone:
             (self.j / "usr" / "bin" / "python3.14").write_text("#!/bin/sh\n")
             (self.j / "usr" / "bin" / "python3.14").chmod(0o755)
         if kaynnissa:
-            (self.tila / "aktiivinen").write_text("")
+            (self.tila / "aktiivinen").write_text("vanha\n")
 
     def git(self, *args: str) -> None:
         subprocess.run(["git", "-C", str(self.repo), *args], check=True)
 
+    def ymparisto(self, **lisa: str) -> dict[str, str]:
+        return {**os.environ, "PATH": f"{self.bin}:{os.environ['PATH']}", "RAVINTOPOLKU_ASENNUSJUURI": str(self.j),
+                "VALEJUURI": str(self.j), "TILA": str(self.tila), "LOKI": str(self.loki), **lisa}
+
     def aja(self, *args: str, **ymparisto: str) -> subprocess.CompletedProcess[str]:
-        env = {**os.environ, "PATH": f"{self.bin}:{os.environ['PATH']}", "RAVINTOPOLKU_ASENNUSJUURI": str(self.j),
-               "VALEJUURI": str(self.j), "TILA": str(self.tila), "LOKI": str(self.loki), **ymparisto}
         return subprocess.run(["bash", str(self.repo / "scripts" / "asenna-tyoasema.sh"), *args],
-                              env=env, capture_output=True, text=True, timeout=60)
+                              env=self.ymparisto(**ymparisto), capture_output=True, text=True, timeout=60)
+
+    def kaynnista(self, virheet: Path, **ymparisto: str) -> subprocess.Popen[bytes]:
+        """Täysi asennus taustalle omassa prosessiryhmässään, jotta testi voi lähettää sille signaalin kuten pääte."""
+        return subprocess.Popen(["bash", str(self.repo / "scripts" / "asenna-tyoasema.sh"), str(self.bin / "uv")],
+                                env=self.ymparisto(**ymparisto), stdout=subprocess.DEVNULL, stderr=virheet.open("wb"),
+                                start_new_session=True)
+
+    def odota(self, ehto, kuvaus: str, aikaraja: float = 20.0) -> None:
+        loppu = time.monotonic() + aikaraja
+        while not ehto():
+            assert time.monotonic() < loppu, f"ei tapahtunut ajoissa: {kuvaus}"
+            time.sleep(0.02)
 
     def taysi(self, **ymparisto: str) -> subprocess.CompletedProcess[str]:
         return self.aja(str(self.bin / "uv"), **ymparisto)
@@ -124,6 +146,11 @@ class Kone:
     @property
     def kaynnissa(self) -> bool:
         return (self.tila / "aktiivinen").exists()
+
+    @property
+    def versio(self) -> str | None:
+        """Käynnissä olevan prosessin versio: se, joka oli asennettuna, kun palvelu käynnistettiin."""
+        return (self.tila / "aktiivinen").read_text().strip() if self.kaynnissa else None
 
     def kutsut(self, komento: str) -> list[str]:
         if not self.loki.exists():
@@ -160,7 +187,7 @@ def test_taysi_asennus_vaihtaa_kaiken_ja_sailyttaa_isannan_lisaryhman(kone: Kone
     # pysäytys ennen vaihtoa, käynnistys vaihdon jälkeen; uv koneen omalla Pythonilla eikä lataa tulkkia
     jarjestys = [r.split()[1] for r in kone.kutsut("systemctl") if r.split()[1] in ("stop", "daemon-reload", "start")]
     assert jarjestys == ["stop", "daemon-reload", "start"]
-    assert kone.kaynnissa
+    assert kone.versio == "uusi"
     (uv,) = kone.kutsut("uv")
     assert f"--python {kone.j}/usr/bin/python3.14" in uv and uv.endswith("lataus=never")
     assert "--frozen --no-dev --no-editable" in uv
@@ -197,8 +224,49 @@ def test_virhe_palvelimen_vaihdossa_palauttaa_edellisen_version(kone: Kone, vika
     assert tulos.returncode != 0
     assert "Palautetaan edellinen versio" in tulos.stderr and "käynnistetty" in tulos.stderr
     kone.ennallaan()
-    assert kone.kaynnissa  # edellinen versio pyörii taas
+    assert kone.versio == "vanha"  # edellinen versio pyörii taas
     assert kone.kutsut("systemctl")[-1] == "systemctl start ravintopolku.service"
+
+
+@pytest.mark.parametrize("merkki", [signal.SIGINT, signal.SIGHUP, signal.SIGTERM])
+def test_keskeytys_uuden_version_jo_kaynnistyttya_palauttaa_ja_kaynnistaa_vanhan(kone: Kone, tmp_path: Path, merkki):
+    # Ctrl-C tai katkennut SSH-yhteys terveystarkistuksen aikana: uusi prosessi pyörii jo. Paluun pitää pysäyttää se,
+    # sillä käynnissä olevalle palvelulle pelkkä start ei tee mitään ja uusi versio jäisi ajoon vanhojen tiedostojen päälle.
+    virheet = tmp_path / "virheet"
+    ajo = kone.kaynnista(virheet, OIKEA_UNI="1")
+    kone.odota(lambda: kone.versio == "uusi", "uusi versio käynnistyi")
+    os.killpg(ajo.pid, merkki)
+    assert ajo.wait(timeout=30) == 130
+    assert "Palautetaan edellinen versio" in virheet.read_text()
+    kone.ennallaan()
+    assert kone.versio == "vanha"
+    toimet = [r.split()[1] for r in kone.kutsut("systemctl") if r.split()[1] in ("stop", "start")]
+    assert toimet == ["stop", "start", "stop", "start"]
+
+
+def test_toinen_keskeytys_ei_katkaise_palautusta(kone: Kone, tmp_path: Path):
+    virheet = tmp_path / "virheet"
+    ajo = kone.kaynnista(virheet, HIDAS_UV="5", HIDAS_KAYNNISTYS="1")
+    kone.odota(lambda: bool(kone.kutsut("uv")), "palvelimen asennus alkoi")
+    os.killpg(ajo.pid, signal.SIGINT)
+    kone.odota(lambda: "Palautetaan" in virheet.read_text(), "palautus alkoi")
+    os.killpg(ajo.pid, signal.SIGINT)  # kärsimätön toinen Ctrl-C kesken palautuksen
+    assert ajo.wait(timeout=30) == 130
+    kone.ennallaan()
+    assert kone.versio == "vanha" and "käynnistetty" in virheet.read_text()
+
+
+@pytest.mark.parametrize("jaanne", ["palvelin.vanha", "dist.vanha"])
+@pytest.mark.parametrize("args", [("UV",), ("--vain-sovellus",)])
+def test_kesken_jaaneen_ajon_varakopiota_ei_poisteta(kone: Kone, jaanne: str, args: tuple[str, ...]):
+    (kone.kohde / jaanne).mkdir()
+    (kone.kohde / jaanne / "ainoa-ehja-kopio").write_text("x")
+    tulos = kone.aja(*[str(kone.bin / "uv") if a == "UV" else a for a in args])
+    assert tulos.returncode == 1 and "jäi kesken" in tulos.stderr and "Mitään ei muutettu" in tulos.stderr
+    assert (kone.kohde / jaanne / "ainoa-ehja-kopio").exists()
+    assert (kone.kohde / "dist" / "index.html").read_text() == "vanha\n"
+    assert (kone.kohde / "palvelin" / "vanha").exists()
+    assert kone.versio == "vanha" and kone.kutsut("docker") == [] and kone.kutsut("systemctl") == []
 
 
 def test_pettavat_testit_eivat_muuta_mitaan(kone: Kone):

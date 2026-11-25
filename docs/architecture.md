@@ -41,7 +41,7 @@ vite-plugin-pwa/Workbox precache sisältää kaikki sovellusresurssit, ei henkil
 Kuvakkeiden nimissä on versio (`public/icon-192-v2.png`): uusi kuva saa uuden nimen, koska puhelimeen asennettu sovellus ei
 hae samasta osoitteesta uutta kuvaa.
 
-## Työaseman palvelin
+## Palvelin (Louhi)
 
 `palvelin/` (Python, Starlette, uv) kuuntelee Unix-soketissa, ja Tailscale Serve välittää siihen portista 8443. Se
 tarjoilee käännöksen turvaotsakkein (CSP ilman inline-skriptejä ja -tyylejä, `font-src 'self'`) ja reitit:
