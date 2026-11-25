@@ -11,6 +11,7 @@ import {
   energiaTavoite,
   makroOsat,
   mittariTeksti,
+  osumaPalkki,
   type Asteikko,
   type MeterReading,
 } from "./makromittarit";
@@ -101,6 +102,7 @@ function Mittari({
   // Ilman tavoitealuetta (tavoite 0) mittari toimii kuten ennen: täysi tavoitteessa, ylitys varoittaa.
   const taytto = a ? a.taytto : r.percent;
   const yli = a ? a.varoitus : r.over !== null && r.over > 0;
+  const osuma = osumaPalkki(a);
   return (
     <div
       className={
@@ -117,10 +119,10 @@ function Mittari({
         <span className="meter-alue" style={{ width: `${100 - a.alku}%` }} />
       )}
       <span className="meter-taytto" style={{ width: `${taytto}%` }} />
-      {a?.osuma === "sisalla" && a.taytto > a.alku && (
+      {osuma && (
         <span
           className="meter-osuma"
-          style={{ left: `${a.alku}%`, width: `${a.taytto - a.alku}%` }}
+          style={{ left: `${osuma.alku}%`, width: `${osuma.leveys}%` }}
         />
       )}
       {a && a.tavoite !== null && (

@@ -110,6 +110,20 @@ export function asteikko(
   };
 }
 
+/** Osuman vihreän osan pienin leveys prosentteina palkista: näkyy, vaikka päivä on täsmälleen alueen alarajalla. */
+export const OSUMA_MIN = 4;
+/**
+ * Alueelle osuneen päivän vihreä osa palkissa: alueen alusta täytön päähän, vähintään OSUMA_MIN leveänä. Kun alue on
+ * kapea tai nollan levyinen (alle 0 %), osa ulottuu täytön päästä taaksepäin, joten osuma näkyy palkissa aina.
+ */
+export function osumaPalkki(
+  a: Asteikko | null,
+): { alku: number; leveys: number } | null {
+  if (a?.osuma !== "sisalla") return null;
+  const alku = Math.max(0, Math.min(a.alku, a.taytto - OSUMA_MIN));
+  return { alku, leveys: a.taytto - alku };
+}
+
 /**
  * Otsikon sivuteksti: yksi tavoite ja sen alue, "tavoite 2 300 (2 070–2 530) kcal", ilman ylärajaa
  * "tavoite 2 300 (väh. 2 070) kcal". Riippuu vain tavoitteesta.
@@ -120,11 +134,13 @@ export function energiaTavoite(
 ): string {
   if (r.goal === null) return "ei tavoitetta";
   const alue = tavoitealue("energy", r.goal, alueet);
-  const vali = !alue
-    ? ""
-    : alue.yla === null
-      ? ` (väh. ${formatNumber(alue.ala, 0)})`
-      : ` (${formatNumber(alue.ala, 0)}–${formatNumber(alue.yla, 0)})`;
+  // Yhden luvun alue (0 % molempiin suuntiin) on sama kuin tavoite: sitä ei toisteta.
+  const vali =
+    !alue || alue.ala === alue.yla
+      ? ""
+      : alue.yla === null
+        ? ` (väh. ${formatNumber(alue.ala, 0)})`
+        : ` (${formatNumber(alue.ala, 0)}–${formatNumber(alue.yla, 0)})`;
   return `tavoite ${formatNumber(r.goal, 0)}${vali} kcal`;
 }
 
@@ -194,8 +210,8 @@ export function mittariTeksti(
 }
 
 /**
- * Tavoitealue sanoina lomakkeeseen: "2 070–2 530 kcal", ilman ylärajaa "vähintään 126 g". Tyhjä, kun tavoitetta ei
- * ole tai alue ei ole laskettavissa.
+ * Tavoitealue sanoina lomakkeeseen: "2 070–2 530 kcal", ilman ylärajaa "vähintään 126 g", yhden luvun alue
+ * "tasan 200 g". Tyhjä, kun tavoitetta ei ole tai alue ei ole laskettavissa.
  */
 export function alueTeksti(
   key: NutrientKey,
@@ -205,7 +221,9 @@ export function alueTeksti(
   const alue = tavoitealue(key, goal, alueet);
   if (!alue) return "";
   const yksikko = meterUnit(key);
-  return alue.yla === null
-    ? `vähintään ${formatNumber(alue.ala, 0)} ${yksikko}`
+  if (alue.yla === null)
+    return `vähintään ${formatNumber(alue.ala, 0)} ${yksikko}`;
+  return alue.ala === alue.yla
+    ? `tasan ${formatNumber(alue.ala, 0)} ${yksikko}`
     : `${formatNumber(alue.ala, 0)}–${formatNumber(alue.yla, 0)} ${yksikko}`;
 }

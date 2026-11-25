@@ -14,7 +14,8 @@ tapauksissa syy kerrotaan oletuksena, samoin kuin mahdollinen makroero. Tuntemat
 Malli ehdottaa myös tavoitealueet: kuinka monta prosenttia päivä saa jäädä alle tavoitteen ja mennä sen yli, jotta se
 lasketaan vielä osumaksi (sovelluksen mittarien vihreä alue). Alue riippuu tavoitteesta: rasvaa pudottavalle energian
 ylitys on tiukempi kuin ylläpidossa. Prosentit tarkistetaan koodissa (ALUERAJAT, ENERGIA_ALLE_MAX); puuttuva tai
-kelvoton alue korvataan oletuksella (OLETUSALUEET), ja se kerrotaan oletuksena. Vastaukseen alueet tulevat vain, kun
+kelvoton alue korvataan oletuksella (OLETUSALUEET), ja se kerrotaan oletuksena. Palvelimen omat huomautukset
+(leikattu luku, makroero, korvattu alue) säilyvät aina: mallin oletuksia karsitaan niiden tieltä. Vastaukseen alueet tulevat vain, kun
 pyynnössä on "alueet": true: välimuistissa oleva vanha sovellusversio ei tunne kenttää ja hylkäisi koko vastauksen.
 
 Vastaus on aina ehdotus: käyttäjä näkee numerot ja perustelun Asetuksissa ja hyväksyy ne vasta tallentaessaan,
@@ -142,8 +143,8 @@ def kehote(teksti: str, profiili: str = "") -> str:
         f"alle {OLETUSALUEET['energy'][0]} ja yli {OLETUSALUEET['energy'][1]}, proteiini alle "
         f"{OLETUSALUEET['protein'][0]} ja yli null, hiilihydraatit ja rasva alle {OLETUSALUEET['carbs'][0]} ja yli "
         f"{OLETUSALUEET['carbs'][1]}.\n"
-        "- Painon tai rasvaprosentin pudotus: ylitys on se, mikä haittaa. Energian yli noin 5, hiilihydraattien ja "
-        "rasvan yli noin 10, proteiinin alle noin 5 ja yli null.\n"
+        "- Painon tai rasvaprosentin pudotus: ylitys on se, mikä haittaa. Energian alle noin 10 ja yli noin 5, "
+        "hiilihydraattien ja rasvan yli noin 10, proteiinin alle noin 5 ja yli null.\n"
         "- Painon tai lihasmassan kasvatus: alitus on se, mikä haittaa. Energian alle noin 5 ja yli 10–15, "
         "proteiinin alle noin 5 ja yli null.\n"
         "- Jos käyttäjä rajoittaa jotakin ravintoainetta (esimerkiksi vähähiilihydraattinen tai vähärasvainen "
@@ -178,9 +179,12 @@ def _luku(arvo: object) -> float | None:
             arvo = float(arvo.strip().replace(",", ".").replace(" ", ""))
         except ValueError:
             return None
-    if not isinstance(arvo, (int, float)) or not math.isfinite(arvo):
+    try:
+        if not isinstance(arvo, (int, float)) or not math.isfinite(arvo):
+            return None
+        return float(arvo)
+    except OverflowError:  # satojen numeroiden kokonaisluku ei mahdu liukuluvuksi: tuntematon, ei palvelinvirhe
         return None
-    return float(arvo)
 
 
 def _arvo(nimi: str, arvo: object, oletukset: list[str]) -> float | None:
@@ -204,8 +208,8 @@ def _arvo(nimi: str, arvo: object, oletukset: list[str]) -> float | None:
 
 
 def _prosentti(arvo: object, kentta: str, katto: int | None = None) -> int | None:
-    """Mallin prosentti kokonaisluvuksi sallitulle välille leikattuna; None, jos arvo ei ole luku."""
-    lukema = _luku(arvo)
+    """Mallin prosentti kokonaisluvuksi sallitulle välille leikattuna; None, jos arvo ei ole luku. "10 %" kelpaa."""
+    lukema = _luku(arvo.replace("%", "") if isinstance(arvo, str) else arvo)
     if lukema is None:
         return None
     alin, ylin = ALUERAJAT[kentta]
@@ -256,7 +260,8 @@ def ehdotukseksi(data: dict, rooli: str, malli: str | None, alueet: bool = False
     alueet: vastaukseen myös tavoitealueet (uusi sovellusversio pyytää ne). Ilman sitä vastaus on vanhassa
     muodossa eikä alueita tarkisteta.
     """
-    oletukset = _oletukset(data.get("oletukset"))
+    mallin = _oletukset(data.get("oletukset"))
+    oletukset: list[str] = []  # palvelimen omat huomautukset: ne eivät saa pudota pois mallin oletusten tieltä
     arvot = {nimi: _arvo(nimi, data.get(nimi), oletukset) for nimi in RAJAT}
     summa = makroenergia(arvot)
     alin, ylin = float(RAJAT["energy"][0]), float(RAJAT["energy"][1])
@@ -281,7 +286,7 @@ def ehdotukseksi(data: dict, rooli: str, malli: str | None, alueet: bool = False
     return {
         **tulos,
         "perustelu": _merkkijono(data.get("perustelu"), PERUSTELU_MAX),
-        "oletukset": oletukset[:OLETUKSIA_MAX],
+        "oletukset": mallin[:max(0, OLETUKSIA_MAX - len(oletukset))] + oletukset[:OLETUKSIA_MAX],
         "rooli": rooli,
         "malli": malli,
     }

@@ -403,6 +403,10 @@ test("tavoitealueen säätö: prosentit Asetuksissa, alue näkyy heti ja Tänä�
   await rasvaYli.fill("0");
   await tallenna.click();
   await expect(page.getByText("Tavoitteet tallennettu.")).toBeVisible();
+  // tallennus vaihtaa lomakkeen, mutta taite pysyy auki ja näyttää tallennetut prosentit
+  await expect(rasvaYli).toBeVisible();
+  await expect(rasvaYli).toHaveValue("0");
+  await expect(energiaYli).toHaveValue("5");
 
   await page.getByRole("link", { name: "Tänään" }).click();
   await expect(page.locator(".label .aside").first()).toHaveText(

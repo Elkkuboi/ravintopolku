@@ -32,6 +32,8 @@ import {
   asteikko,
   energiaTavoite,
   meterReading,
+  osumaPalkki,
+  OSUMA_MIN,
 } from "../src/components/makromittarit";
 import { macroCharts } from "../src/components/makrokuvaajat";
 import {
@@ -192,6 +194,67 @@ describe("mittarit tavoitteen omilla alueilla", () => {
     });
   });
 
+  it("osuma näkyy palkissa aina, myös alueen alarajalla ja nollan levyisellä alueella", () => {
+    const palkki = (
+      key: "energy" | "protein" | "carbs",
+      syoty: number,
+      goal: number,
+      alueet: Alueet,
+    ) => osumaPalkki(asteikko(key, meterReading(total(syoty), goal), alueet));
+    // tavallinen osuma: alueen alusta täytön päähän
+    const a = asteikko("energy", meterReading(total(2000), 2000), TIUKAT)!;
+    expect(osumaPalkki(a)).toEqual({ alku: a.alku, leveys: a.taytto - a.alku });
+    expect(a.taytto - a.alku).toBeGreaterThan(OSUMA_MIN);
+    // täsmälleen alarajalla täyttö päättyy alueen alkuun: vihreä kärki silti näkyy
+    const rajalla = palkki("energy", 1800, 2000, TIUKAT)!;
+    expect(rajalla.leveys).toBeCloseTo(OSUMA_MIN, 5);
+    expect(rajalla.alku + rajalla.leveys).toBeCloseTo((1800 / 2100) * 100, 5);
+    // alle 0 %: vähintään-tavoitteen alue alkaa palkin päästä, eikä sillä ole leveyttä
+    const lattia: Alueet = { ...OLETUSALUEET, protein: { alle: 0, yli: null } };
+    expect(palkki("protein", 150, 140, lattia)).toEqual({
+      alku: 100 - OSUMA_MIN,
+      leveys: OSUMA_MIN,
+    });
+    expect(palkki("protein", 139, 140, lattia)).toBeNull();
+    // 0 % molempiin suuntiin: tavoitteessa oleva päivä erottuu ylittäneestä
+    const tarkka: Alueet = { ...OLETUSALUEET, carbs: { alle: 0, yli: 0 } };
+    expect(palkki("carbs", 200, 200, tarkka)).toEqual({
+      alku: 100 - OSUMA_MIN,
+      leveys: OSUMA_MIN,
+    });
+    expect(palkki("carbs", 260, 200, tarkka)).toBeNull();
+    expect(palkki("carbs", 199, 200, tarkka)).toBeNull();
+    // osittainen summa ei ratkaise kaksisuuntaista aluetta, eikä tyhjällä asteikolla ole osumaa
+    expect(
+      osumaPalkki(
+        asteikko("energy", meterReading(total(2000, 2, 1), 2000), TIUKAT),
+      ),
+    ).toBeNull();
+    expect(osumaPalkki(null)).toBeNull();
+    // pieni täyttö ei vie osaa palkin vasemman reunan yli
+    const pieni: Alueet = { ...OLETUSALUEET, energy: { alle: 50, yli: 100 } };
+    const p = palkki("energy", 1000, 2000, pieni)!;
+    expect(p.alku).toBeGreaterThanOrEqual(0);
+    expect(p.alku + p.leveys).toBeCloseTo(25, 5);
+  });
+
+  it("yhden luvun alue ei toista tavoitetta otsikossa, ja lomake sanoo tasan", () => {
+    const tarkka: Alueet = {
+      ...OLETUSALUEET,
+      energy: { alle: 0, yli: 0 },
+      carbs: { alle: 0, yli: 0 },
+    };
+    expect(nbsp(energiaTavoite(meterReading(total(1500), 2000), tarkka))).toBe(
+      "tavoite 2 000 kcal",
+    );
+    expect(alueTeksti("carbs", 200, tarkka)).toBe("tasan 200 g");
+    expect(nbsp(alueTeksti("energy", 2000, tarkka))).toBe("tasan 2 000 kcal");
+    // pieni tavoite, jonka rajat pyöristyvät samaan lukuun
+    expect(
+      alueTeksti("fiber", 3, { ...OLETUSALUEET, fiber: { alle: 10, yli: 10 } }),
+    ).toBe("tasan 3 g");
+  });
+
   it("alueTeksti lomakkeeseen: väli, vähintään tai tyhjä", () => {
     expect(nbsp(alueTeksti("energy", 2000, TIUKAT))).toBe("1 800–2 100 kcal");
     expect(alueTeksti("protein", 150, TIUKAT)).toBe("vähintään 143 g");
@@ -229,6 +292,24 @@ describe("mittarit tavoitteen omilla alueilla", () => {
     expect(tiukka).toContain('<span class="osui">145</span> / 150 g');
     expect(tiukka).not.toContain('<span class="osui">61</span>');
     expect(tiukka).toContain('<span class="osui">200</span> / 200 g');
+    // vihreä osa palkissa vain alueelle osuneilla: proteiini ja hiilihydraatit, ei energia eikä rasva
+    expect(tiukka.split('class="meter-osuma"').length - 1).toBe(2);
+    // 0 %:n alue: osuma näkyy palkissa, vaikka alueella ei ole leveyttä
+    const lattia = piirra(
+      tavoite(
+        { protein: 145, carbs: 200 },
+        {
+          ...OLETUSALUEET,
+          protein: { alle: 0, yli: null },
+          carbs: { alle: 0, yli: 0 },
+        },
+      ),
+    );
+    expect(lattia).toContain('<span class="osui">145</span> / 145 g');
+    expect(lattia.split('class="meter-osuma"').length - 1).toBe(2);
+    expect(lattia).toContain(
+      `class="meter-osuma" style="left:${100 - OSUMA_MIN}%;width:${OSUMA_MIN}%"`,
+    );
   });
 });
 

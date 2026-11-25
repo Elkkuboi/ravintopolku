@@ -156,9 +156,13 @@ function AlueKentat({
 function TavoiteLomake({
   nykyinen,
   notify,
+  alueAuki,
+  onAlueAuki,
 }: {
   nykyinen?: Goal;
   notify: Notify;
+  alueAuki: boolean;
+  onAlueAuki: (auki: boolean) => void;
 }) {
   const [arvot, setArvot] = useState(() =>
     nykyinen ? nutrientStrings(nykyinen.nutrients) : blankNutrientStrings(),
@@ -197,7 +201,11 @@ function TavoiteLomake({
           <Decimal value={paino} onChange={setPaino} placeholder="" />
         </Field>
       </div>
-      <details className="fold">
+      <details
+        className="fold"
+        open={alueAuki}
+        onToggle={(e) => onAlueAuki(e.currentTarget.open)}
+      >
         <summary>Tavoitealue</summary>
         <AlueKentat alueet={alueet} tavoitteet={arvot} onChange={setAlueet} />
       </details>
@@ -343,6 +351,9 @@ export function Tavoitteet({
 }) {
   const nykyinen = goalForDay(data.goals, localDay()),
     profiili = data.profiles[0];
+  // Taitteen tila on lomakkeen yläpuolella: tallennus vaihtaa lomakkeen avaimen, eikä juuri säädetty alue saa
+  // sulkeutua silmien edestä.
+  const [alueAuki, setAlueAuki] = useState(false);
   return (
     <section>
       <h2 className="label">Tavoitteet</h2>
@@ -351,6 +362,8 @@ export function Tavoitteet({
         key={nykyinen?.id ?? "ei"}
         nykyinen={nykyinen}
         notify={notify}
+        alueAuki={alueAuki}
+        onAlueAuki={setAlueAuki}
       />
       <Ehdotus data={data} nykyinen={nykyinen} notify={notify} />
       <details className="fold">
