@@ -1,8 +1,8 @@
 # ILMARI ja aiops
 
 Ravintopolku ottaa Ilmarilta vastaan tarkistettavia aterialuonnoksia ja käyttää aiops-välittäjää kahteen asiaan:
-kuvasta ateria ja tavoite-ehdotus. Kaikki kulkee työaseman Python-palvelimen (`palvelin/`) kautta samasta alkuperästä
-(`https://tyoasema.taild1a5b7.ts.net:8443`) Tailscale-tunnistuksella. Ilmari ei kirjoita päiväkirjaan: luonnos tai
+kuvasta ateria ja tavoite-ehdotus. Kaikki kulkee Louhin Python-palvelimen (`palvelin/`) kautta samasta alkuperästä
+(`https://louhi.taild1a5b7.ts.net:8443`) Tailscale-tunnistuksella. Ilmari ei kirjoita päiväkirjaan: luonnos tai
 ehdotus päätyy päiväkirjaan vasta käyttäjän tarkistuksen ja tallennuksen jälkeen.
 
 ## Tuloskuori
@@ -123,7 +123,7 @@ Asetusten vanhat kentät `kuvantunnistus` ja `kuvantulkinta` säilyvät datassa 
 
 Asetukset → Tavoitteet → taite **Ehdota tavoitteet omin sanoin**: vapaa tekstikenttä (esim. "painon lievä pudotus" tai
 "rasvan muuttaminen lihakseksi") ja **Ehdota**. Sovellus lähettää tekstin sekä
-lyhyen kuvan nykytilanteesta (ikä, pituus, uusin paino, treenit, nykyinen energiatavoite) työaseman palvelimelle, joka
+lyhyen kuvan nykytilanteesta (ikä, pituus, uusin paino, treenit, nykyinen energiatavoite) Louhin palvelimelle, joka
 kutsuu aiops-välittäjää samalla tavalla kuin kuvasta ateria. Ilmari ehdottaa päivän energia- ja makrotavoitteet sekä
 lyhyen perustelun, ja ehdotus näkyy **tarkistettavana**: luvut voi muokata, ja vasta **Ota käyttöön** kirjoittaa tavoitteen. Hylättyä tai epäonnistunutta ehdotusta ei tallenneta, eikä olemassa olevaa tavoitetta muuteta.
 

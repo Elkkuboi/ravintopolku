@@ -1,7 +1,7 @@
 # Ravintopolku
 
 Eliaksen ruokapäiväkirja puhelimelle: ateriat kuvasta tai käsin, paino, energia ja makrot tavoitetta vasten. Sovellus
-on PWA. Päiväkirja on puhelimen selaimessa (IndexedDB), toimii ilman verkkoa ja synkronoituu työaseman palvelimelle
+on PWA. Päiväkirja on puhelimen selaimessa (IndexedDB), toimii ilman verkkoa ja synkronoituu Louhin palvelimelle
 (`palvelin/`, Python). Ulkoasu on Ilmari Hubin tyyli, ja värit tulevat Hubista.
 
 ## Mitä siinä on
@@ -9,7 +9,7 @@ on PWA. Päiväkirja on puhelimen selaimessa (IndexedDB), toimii ilman verkkoa j
 - **Tänään**: päivän energia ja makrot, **Ota kuva** (kamera), **Galleriasta** ja **Kirjoita** (käsin), ateriat, paino,
   **Treenipäivä** (yksi napautus) ja taitettu "Uni, liike ja olo". Ilmarin odottavat luonnokset näkyvät vain, kun
   niitä on.
-- **Kuvasta ateria**: kuva pienennetään puhelimessa enintään 700 kt:n JPEGiksi ja tulkitaan työaseman palvelimen ja
+- **Kuvasta ateria**: kuva pienennetään puhelimessa enintään 700 kt:n JPEGiksi ja tulkitaan Louhin palvelimen ja
   aiops-välittäjän kautta (rooli `kuva_tulkki`, Hub päättää mallin). Tulos on tallentamaton luonnos, jonka käyttäjä
   tarkistaa ja tallentaa tai hylkää.
 - **Kehitys**: paino, energia ja proteiini 7, 30 tai 90 päivältä tai koko ajalta; päivittäiset luvut taitettuna.
@@ -28,11 +28,12 @@ pysyvät laitteella eivätkä synkronoidu. Yli 25 poistoa kerralla vaatii vahvis
 - `palvelin/`: Python (Starlette, uv). Tarjoilee käännöksen ja reitit `/api/synk`, `/api/luonnokset`,
   `/api/kuva-ateria`, `/api/tavoitteet`, `/api/ulkoasu` ja `/api/kehotteet`. Tunnistus on Tailscale-identiteetti, ja CSP kieltää
   inline-skriptit ja -tyylit.
-- `scripts/asenna-tyoasema.sh`: käännös ja asennus työasemalle.
+- `scripts/asenna-tyoasema.sh`: käännös ja asennus (nimi on historiaa: palvelu pyörii Louhilla).
 
 ## Kehitys ja tarkistukset
 
-Node 24 (asennus kääntää versiolla 24.19.0), npm ja uv.
+Node 24 (asennus kääntää versiolla 24.19.0), npm ja uv. Palvelin ajetaan tuotannossa Louhin omalla Python 3.14:llä.
+Koodin pitää toimia myös Python 3.12:lla (`palvelin/.python-version`), koska Ilmarin kontissa ei ole muuta.
 
 ```bash
 npm ci --ignore-scripts
@@ -44,19 +45,22 @@ npm run test:e2e               # savutesti järjestelmän Chromella (tests/e2e/s
 `npm run dev` käynnistää pelkän käyttöliittymän ilman rajapintaa: synkronointi ja kuvan tulkinta eivät silloin toimi.
 Tarkemmin: [docs/testing.md](docs/testing.md).
 
-## Asennus työasemalle
+## Asennus
 
-Käyttöönotto tehdään aiops-repon kääreellä, kun commit on GitHubin mainissa:
+Palvelu pyörii Louhilla (24.11.2026 alkaen). Asennus tehdään Louhilla repon kopiosta, kun commit on GitHubin mainissa:
 
 ```bash
-sudo ravintopolku-kayttoonotto TÄYSI_COMMIT
+sudo scripts/asenna-tyoasema.sh /opt/louhi-ravintopolku-runtime/uv   # sovellus ja palvelin
+sudo scripts/asenna-tyoasema.sh --vain-sovellus                      # vain käyttöliittymä, palvelin ennallaan
 ```
 
-Kääre ajaa `scripts/asenna-tyoasema.sh`:n. Se kääntää commitoidun koodin kertakäyttöisissä konteissa (`npm ci`
-verkon kanssa, `npm test` ja `npm run build` ilman verkkoa), asentaa `dist/`:n hakemistoon `/opt/ravintopolku/dist` ja
-palvelimen hakemistoon `/opt/ravintopolku/palvelin`. Jos asennus tai terveystarkistus pettää, edellinen versio
-asennetaan takaisin. Palvelimen asetukset ovat tiedostossa `/etc/ravintopolku/palvelin.toml` (malli
-`config/palvelin.toml.esimerkki`). Sovellus on osoitteessa `https://tyoasema.<tailnet>.ts.net:8443`.
+Skripti kääntää commitoidun koodin kertakäyttöisissä konteissa (`npm ci` verkon kanssa, `npm test` ja `npm run build`
+ilman verkkoa), asentaa `dist/`:n hakemistoon `/opt/ravintopolku/dist` ja palvelimen hakemistoon
+`/opt/ravintopolku/palvelin` koneen omalla Pythonilla (`/usr/bin/python3.14`). Jos jokin vaihe pettää, edellinen
+sovellus, palvelin ja palvelutiedosto palautetaan ja palvelu käynnistetään uudelleen. Isännän oma lisäryhmä
+(Louhilla `SupplementaryGroups=aiops-ceo`, jolla palvelu pääsee välittäjän sokettiin) säilyy tiedostossa
+`ravintopolku.service.d/isanta.conf`. Palvelimen asetukset ovat tiedostossa `/etc/ravintopolku/palvelin.toml` (malli
+`config/palvelin.toml.esimerkki`). Sovellus on osoitteessa `https://louhi.<tailnet>.ts.net:8443`.
 
 Puhelimessa uusi versio tulee käyttöön, kun yläreunassa napauttaa **Päivitä**.
 

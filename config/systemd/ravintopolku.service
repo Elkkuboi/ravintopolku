@@ -2,6 +2,8 @@
 # Kuuntelee Unix-soketissa /run/ravintopolku/palvelin.sock (hakemisto 0700), johon Tailscale Serve ohjaa portin 8443.
 # Kovennus Ilmari Hubin mallilla. Erot: kirjoitusoikeus vain päiväkirjan hakemistoon ja julkiseen kopioon (BindPaths);
 # /srv:stä ei näy muuta. Ei ryhmiä aiops eikä docker, ei verkkoa, ei salaisuuksia. Testi palvelin/tests/test_yksikko.py.
+# Isännän oma lisäys kuuluu tiedostoon ravintopolku.service.d/isanta.conf, johon asennus ei koske (Louhilla
+# SupplementaryGroups=aiops-ceo: välittäjän sokettihakemisto on siellä 0750 ryhmälle aiops-ceo).
 
 [Unit]
 Description=Ravintopolku: päiväkirjan synkronointipalvelin portissa 8443 (aiops ADR-0016)

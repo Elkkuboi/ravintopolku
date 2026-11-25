@@ -1,7 +1,7 @@
 [project]
 name = "ravintopolku-palvelin"
 version = "0.1.0"
-description = "Ravintopolun synkronointipalvelin työasemalle (aiops ADR-0016)"
+description = "Ravintopolun synkronointipalvelin (aiops ADR-0016)"
 requires-python = ">=3.12"
 dependencies = ["starlette>=0.40", "uvicorn>=0.30"]
 

@@ -37,7 +37,7 @@ saa tarvita verkkoa. Asennus ei aja Playwrightia eikä pytestiä: aja ne itse en
 ## Savutesti (Playwright)
 
 `tests/e2e/savu.spec.ts` kääntää sovelluksen ja ajaa sen `vite preview` -palvelimella, joka antaa saman
-CSP-otsakkeen kuin työaseman palvelin. `/api/*` mockataan testissä (`page.route`), joten testi ei tarvitse palvelinta,
+CSP-otsakkeen kuin tuotannon palvelin. `/api/*` mockataan testissä (`page.route`), joten testi ei tarvitse palvelinta,
 verkkoa eikä aiopsia. Selain on järjestelmän Chrome (`channel: "chrome"`), puhelimen kokoinen ikkuna 390 × 844.
 
 Testi tarkistaa:
@@ -56,7 +56,13 @@ Testi tarkistaa:
 
 ## Palvelin (pytest)
 
-`palvelin/tests/`: tunnistus ja turvaotsakkeet, synkronointi, luonnoslaatikko, kuvan tulkinta (700 kt:n raja,
+`palvelin/tests/test_asennus.py` ajaa asennusskriptin väliaikaisessa juuressa valekomennoilla (Docker, systemd, uv):
+onnistunut asennus, paluu edelliseen versioon kun palvelimen asennus tai käynnistys pettää, `--vain-sovellus`,
+isännän lisäryhmän säilyminen, keskeytys (Ctrl-C tai katkennut yhteys) myös uuden version jo käynnistyttyä ja
+kahdesti peräkkäin, kesken jääneen ajon varakopio ja se, ettei puuttuva Python ehdi muuttaa mitään. Tuotanto ajaa
+Python 3.14:ää: aja palvelimen testit ennen yhdistämistä myös sillä (`uv run --python 3.14 --frozen pytest -q`).
+
+Muut `palvelin/tests/`: tunnistus ja turvaotsakkeet, synkronointi, luonnoslaatikko, kuvan tulkinta (700 kt:n raja,
 virheteksti ilman välittäjän tekstiä), tavoite-ehdotus, väri (`/api/ulkoasu`), kielimallin ohjeet (`/api/kehotteet`:
 samat tekstit kuin oikeassa kutsussa, vain luku) ja woff2:n MIME-tyyppi.
 
