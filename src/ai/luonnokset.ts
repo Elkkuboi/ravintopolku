@@ -15,7 +15,7 @@ export async function haeLuonnokset(hae: typeof fetch = fetch): Promise<LuonnosT
   try {
     r = await hae("/api/luonnokset", { credentials: "same-origin" });
   } catch {
-    return { tila: "virhe", viesti: "Työaseman palvelimeen ei saada yhteyttä." };
+    return { tila: "virhe", viesti: "Palvelimeen ei saada yhteyttä." };
   }
   if (r.status === 404 || r.status === 401) return { tila: "ei-palvelinta" }; // 401: Node ilman istuntoa
   if (!r.ok) return { tila: "virhe", viesti: `palvelin vastasi ${r.status}` };
@@ -34,7 +34,7 @@ export async function poistaLuonnos(id: number | string, hae: typeof fetch = fet
       headers: { "X-Ravintopolku": "1" }, // Node-palvelimen vaatimus; työaseman palvelin ei välitä otsakkeesta
     });
   } catch {
-    throw new Error("Työaseman palvelimeen ei saada yhteyttä.");
+    throw new Error("Palvelimeen ei saada yhteyttä.");
   }
   if (r.status === 404) throw new Error("Luonnosta ei enää ole palvelimen laatikossa.");
   if (!r.ok) throw new Error("Kuittaus ei onnistunut. Yritä myöhemmin uudelleen.");

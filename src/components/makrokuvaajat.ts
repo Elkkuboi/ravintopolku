@@ -1,6 +1,11 @@
 import { labels, type Dataset } from "../domain/model";
 import { dailySeries, observedMean } from "../domain/analytics";
-import { goalForDay, formatNumber } from "../domain/nutrition";
+import {
+  goalForDay,
+  formatNumber,
+  osuma,
+  type Tavoitealue,
+} from "../domain/nutrition";
 import { dayDistance, dayRange } from "../domain/dates";
 import { meterKeys, meterUnit, type MeterKey } from "./makromittarit";
 // Daily macro series for the charts: a period of calendar days ending at `end`
@@ -126,25 +131,23 @@ export function jaksonKeskiarvo(
 }
 
 /**
- * Days on which the goal was reached, out of the days whose outcome is known. A partial sum is a lower bound, so it
- * already counts as reached once it is at the goal; below the goal it is unknown and left out, as is today in
- * progress.
+ * Days that landed in the goal's target zone (the same rule as the Tänään meters), out of the days whose outcome is
+ * known. A partial sum and today in progress are lower bounds: they count once the bound proves the outcome (an
+ * "at least" goal is reached, or the upper end is exceeded); otherwise the day is unknown and left out.
  */
 export function tavoitePaivat(
   data: Dataset,
   end: string,
   points: MacroPoint[],
-  goal: number,
+  alue: Tavoitealue,
 ): { taytti: number; paivia: number } {
   let taytti = 0,
     paivia = 0;
   for (const p of points) {
-    if (p.value === null) continue;
-    const ok = p.value >= goal;
-    if (ok || (!p.partial && lopullinen(data, end, p.date))) {
-      paivia++;
-      if (ok) taytti++;
-    }
+    const o = osuma(p.value, alue, p.partial || !lopullinen(data, end, p.date));
+    if (o === null) continue;
+    paivia++;
+    if (o === "sisalla") taytti++;
   }
   return { taytti, paivia };
 }

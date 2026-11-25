@@ -21,6 +21,7 @@ import {
   VIIKOITTAIN_YLI,
   type MacroPoint,
 } from "../src/components/makrokuvaajat";
+import { tavoitealue } from "../src/domain/nutrition";
 import { line, meal } from "./fixtures";
 const goal = (effectiveDate: string, energy: number | null): Goal => ({
   ...stamped(),
@@ -191,20 +192,47 @@ describe("Kehityksen keskiarvo ja tavoitepäivät", () => {
       count: 1,
     });
   });
-  it("tavoite täyttyy, kun summa on vähintään tavoite; osittainen alaraja riittää, jos se ylittää", () => {
+  it("vähintään-tavoite täyttyy alueen alarajasta; osittainen alaraja riittää, jos se yltää alueelle", () => {
+    // proteiini 100 g: alue vähintään 90 g, ei ylärajaa (sama sääntö kuin Tänään-sivun mittarissa)
+    const alue = tavoitealue("protein", 100)!;
+    expect(alue).toEqual({ ala: 90, yla: null });
     const points = [
-      p("2026-11-14", 120),
-      p("2026-11-15", 80),
-      p("2026-11-16", 110, true), // osittainen mutta yli: täyttyi varmasti
+      p("2026-11-13", 250), // reilusti yli: vähintään-tavoitteessa ei ylärajaa
+      p("2026-11-14", 90), // alarajalla: täyttyi
+      p("2026-11-15", 89), // juuri alle: ei täyttynyt
+      p("2026-11-16", 95, true), // osittainen mutta alueella: täyttyi varmasti
       p("2026-11-17", 60, true), // osittainen ja alle: ei tiedetä
       p("2026-11-18", null),
       p(end, 40), // tänään kesken: ei tiedetä
     ];
-    expect(tavoitePaivat(emptyDataset(), end, points, 100)).toEqual({
-      taytti: 2,
-      paivia: 3,
+    expect(tavoitePaivat(emptyDataset(), end, points, alue)).toEqual({
+      taytti: 3,
+      paivia: 4,
     });
-    expect(tavoitePaivat(emptyDataset(), end, [p(end, 105)], 100)).toEqual({
+    expect(tavoitePaivat(emptyDataset(), end, [p(end, 92)], alue)).toEqual({
+      taytti: 1,
+      paivia: 1,
+    });
+  });
+  it("kaksisuuntainen alue: ylitys ei ole osuma, ja alaraja todistaa vain ylityksen", () => {
+    const alue = tavoitealue("energy", 2000)!; // 1800–2200
+    const points = [
+      p("2026-11-13", 1800),
+      p("2026-11-14", 2200),
+      p("2026-11-15", 2201), // yli: tiedetään, ei osuma
+      p("2026-11-16", 1799), // alle: tiedetään, ei osuma
+      p("2026-11-17", 2000, true), // osittainen alueella: voi vielä ylittää, ei tiedetä
+      p("2026-11-18", 2500, true), // osittainen jo yli: tiedetään
+      p(end, 2000), // tänään kesken alueella: ei tiedetä
+    ];
+    expect(tavoitePaivat(emptyDataset(), end, points, alue)).toEqual({
+      taytti: 2,
+      paivia: 5,
+    });
+    // valmiiksi merkitty tämä päivä lasketaan
+    const valmis = emptyDataset();
+    valmis.days = [{ ...stamped(), date: end, complete: true }];
+    expect(tavoitePaivat(valmis, end, [p(end, 2000)], alue)).toEqual({
       taytti: 1,
       paivia: 1,
     });

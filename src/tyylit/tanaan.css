@@ -10,6 +10,9 @@ label.day-name { position: relative; display: flex; align-items: center; justify
 /* Energia ja makrot */
 .meter + .macros { margin-top: 1.1rem; }
 .figure-of.yli { color: var(--warn); }
+/* Päivä osui tavoitealueelle: luku vihertää. Makrorivillä luku myös lihavoituu, jotta väri ei ole ainoa merkki. */
+.figure-num.osui, .figure-of.osui, .macros .osui { color: var(--ok); }
+.macros .osui { font-weight: 600; }
 
 /* Kuvanapit: rivien väli kuten mallissa; label ja button samalle linjalle */
 section.capture { row-gap: 1.4rem; }   /* style.css tulee nippuun myöhemmin: ilman section-tarkennusta .6rem voittaisi */

@@ -191,11 +191,18 @@ th:last-child, td:last-child { padding-right: 0; }   /* viimeisen sarakkeen täy
 .figure-num { font-size: 30px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .figure-unit { color: var(--ink-2); }
 .figure-of { color: var(--ink-3); margin-left: auto; white-space: nowrap; }
-.meter { height: 10px; border: 1px solid var(--ink); background: var(--sheet); }
-.meter > span { display: block; height: 100%; background: var(--ink); }
-.meter--over > span { background: var(--warn); }
+/* Mittari: täyttö, palkin päässä tavoitealue (haalea), alueelle osunut täyttö ja tavoitteen merkki. Leveydet ja
+   paikat asettaa MakroMittarit.tsx; maalausjärjestys on sama kuin elementtien järjestys. */
+.meter { position: relative; height: 10px; border: 1px solid var(--ink); background: var(--sheet); }
+.meter > span { position: absolute; top: 0; bottom: 0; }
+.meter-alue { right: 0; background: var(--ok); opacity: .3; }
+.meter-taytto { left: 0; background: var(--ink); }
+.meter-osuma { background: var(--ok); }
+.meter > .meter-tavoite { top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); }
+.meter--over .meter-taytto { background: var(--warn); }
 .meter--thin { height: 6px; border-color: var(--ink-3); }
-.meter--thin > span { background: var(--ink-2); }
+.meter--thin .meter-taytto { background: var(--ink-2); }
+.meter--thin > .meter-tavoite { top: -2px; bottom: -2px; background: var(--ink-2); }
 .macros { display: grid; grid-template-columns: max-content 1fr max-content; gap: .45rem 1.5ch; align-items: center; }
 .macros dt { color: var(--ink-2); }
 .macros dd { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -242,7 +249,7 @@ a.meal, button.meal { display: grid; grid-template-columns: 5.5ch 1fr max-conten
 /* --- Ravintopolun kuori ja yhteiset osat (App.tsx, components/common.tsx). Näkymien omat tyylit: src/tyylit/. ---- */
 [hidden] { display: none !important; }
 main > .wrap > .sivu > * + * { margin-top: var(--gap); }        /* Tänään piilotettavassa kääreessä (App.tsx) */
-.meter--thin.meter--over > span { background: var(--warn); }   /* rp.css:n järjestys peittäisi ylityksen */
+.meter--thin.meter--over .meter-taytto { background: var(--warn); }   /* rp.css:n järjestys peittäisi ylityksen */
 section.actions > * { margin-top: 0; }                          /* napit samalle riville: ei section-väliä */
 .paivitys { background: var(--sheet); border-bottom: 1px solid var(--rule); }
 .paivitys .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1ch; padding-top: .3rem; padding-bottom: .3rem; }

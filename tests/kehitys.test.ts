@@ -71,7 +71,7 @@ describe("Kehitys-sivu", () => {
   it("proteiinitavoite lasketaan päättyneistä päivistä; tämän päivän kesken oleva jää pois", () => {
     const html = piirra(data());
     // kolme päättynyttä päivää ≥ 12 g (osittainenkin ylittää), tänään 15 g ≥ 12 g on jo täyttynyt
-    expect(html).toContain("Tavoite täyttyi 4 päivänä 4:stä.");
+    expect(html).toContain("Tavoitealueella 4 päivänä 4:stä.");
   });
   it("jakso 7 / 30 / 90 pv / kaikki, oletuksena 30 pv, painikkeina", () => {
     const html = piirra(data());

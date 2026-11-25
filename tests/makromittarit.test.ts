@@ -123,12 +123,12 @@ describe("Energia ja makrot -tekstit", () => {
     const r = meterReading(total(1890), 2200);
     expect(nbsp(energiaLuku(r))).toBe("1 890");
     expect(nbsp(energiaJaljella(r)?.teksti)).toBe("310 jäljellä");
-    expect(energiaJaljella(r)?.yli).toBe(false);
+    expect(energiaJaljella(r)?.luokka).toBeNull();
   });
-  it("yli tavoitteen näkyy omana tekstinään", () => {
+  it("yli tavoitteen näkyy omana tekstinään; ilman tavoitealuetta ylitys varoittaa", () => {
     expect(energiaJaljella(meterReading(total(2320), 2200))).toEqual({
       teksti: "yli 120",
-      yli: true,
+      luokka: "yli",
     });
   });
   it("osittainen summa: jäljellä on enimmäismäärä ja makrossa ≥", () => {

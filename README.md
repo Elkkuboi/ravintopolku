@@ -9,6 +9,10 @@ on PWA. Päiväkirja on puhelimen selaimessa (IndexedDB), toimii ilman verkkoa j
 - **Tänään**: päivän energia ja makrot, **Ota kuva** (kamera), **Galleriasta** ja **Kirjoita** (käsin), ateriat, paino,
   **Treenipäivä** (yksi napautus) ja taitettu "Uni, liike ja olo". Ilmarin odottavat luonnokset näkyvät vain, kun
   niitä on.
+- **Tavoitealue**: tavoite on yksi luku, ja mittarin pääty näyttää päivän hyväksytyn vaihtelun sen ympärillä:
+  energia ±10 %, hiilihydraatit ja rasva ±20 %, proteiini ja kuitu vähintään 90 % ilman ylärajaa
+  (`src/domain/nutrition.ts`). Alueelle osunut luku vihertää, ja vain energian ylitys varoittaa. Kehityksen
+  lause "Tavoitealueella N päivänä" käyttää samaa sääntöä.
 - **Kuvasta ateria**: kuva pienennetään puhelimessa enintään 700 kt:n JPEGiksi ja tulkitaan Louhin palvelimen ja
   aiops-välittäjän kautta (rooli `kuva_tulkki`, Hub päättää mallin). Tulos on tallentamaton luonnos, jonka käyttäjä
   tarkistaa ja tallentaa tai hylkää.
