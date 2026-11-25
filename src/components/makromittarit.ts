@@ -105,20 +105,21 @@ export function asteikko(key: NutrientKey, r: MeterReading): Asteikko | null {
   };
 }
 
-/** Otsikon sivuteksti: yksi tavoite ja sen alue, "tavoite 2 300 (2 070–2 530) kcal". */
-export function energiaTavoite(r: MeterReading, a: Asteikko | null): string {
+/** Otsikon sivuteksti: yksi tavoite ja sen alue, "tavoite 2 300 (2 070–2 530) kcal". Riippuu vain tavoitteesta. */
+export function energiaTavoite(r: MeterReading): string {
   if (r.goal === null) return "ei tavoitetta";
-  const alue =
-    a && a.alue.yla !== null
-      ? ` (${formatNumber(a.alue.ala, 0)}–${formatNumber(a.alue.yla, 0)})`
+  const alue = tavoitealue("energy", r.goal);
+  const vali =
+    alue && alue.yla !== null
+      ? ` (${formatNumber(alue.ala, 0)}–${formatNumber(alue.yla, 0)})`
       : "";
-  return `tavoite ${formatNumber(r.goal, 0)}${alue} kcal`;
+  return `tavoite ${formatNumber(r.goal, 0)}${vali} kcal`;
 }
 
 /**
- * Luvun oikea puoli: jäljellä tai yli tavoitteen, aina siitä yhdestä tavoitteesta laskettuna; osittainen summa
- * kertoo enimmäismäärän. Luokka kertoo värin: "osui" tavoitealueella, "yli" alueen yläpuolella (ilman aluetta
- * tavoitteen yläpuolella).
+ * Luvun oikea puoli: jäljellä tai yli tavoitteen, aina siitä yhdestä tavoitteesta ja näytetyistä (pyöristetyistä)
+ * luvuista laskettuna, joten "yli 0" ei ole mahdollinen. Osittainen summa kertoo enimmäismäärän. Luokka kertoo värin:
+ * "osui" tavoitealueella, "yli" alueen yläpuolella (ilman aluetta tavoitteen yläpuolella).
  */
 export function energiaJaljella(
   r: MeterReading,
@@ -129,7 +130,9 @@ export function energiaJaljella(
     return r.empty
       ? { teksti: `${formatNumber(r.goal, 0)} jäljellä`, luokka: null }
       : null;
-  const yli = r.over! > 0;
+  const syoty = Math.round(r.consumed),
+    tavoite = Math.round(r.goal);
+  const yli = syoty > tavoite;
   const luokka = a
     ? a.osuma === "sisalla"
       ? "osui"
@@ -141,8 +144,8 @@ export function energiaJaljella(
       : null;
   return {
     teksti: yli
-      ? `yli ${formatNumber(r.over, 0)}`
-      : `${r.partial ? "enint. " : ""}${formatNumber(r.remaining, 0)} jäljellä`,
+      ? `yli ${formatNumber(syoty - tavoite, 0)}`
+      : `${r.partial ? "enint. " : ""}${formatNumber(tavoite - syoty, 0)} jäljellä`,
     luokka,
   };
 }

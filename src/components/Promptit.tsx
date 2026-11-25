@@ -10,7 +10,7 @@ export function PromptiLista({ tila }: { tila: PromptiTila }) {
   if (tila === null) return null;
   if (tila === "haetaan") return <p className="empty">Haetaan…</p>;
   if (tila === "virhe")
-    return <p className="empty">Prompteja ei saatu työasemalta.</p>;
+    return <p className="empty">Prompteja ei saatu palvelimelta.</p>;
   return (
     <>
       {tila.map((k) => (

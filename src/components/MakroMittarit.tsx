@@ -31,7 +31,7 @@ export function MakroMittarit({
   return (
     <section aria-label="Energia ja makrot">
       <h2 className="label">
-        Energia <span className="aside">{energiaTavoite(energia, alue)}</span>
+        Energia <span className="aside">{energiaTavoite(energia)}</span>
       </h2>
       <div className="figure">
         <span

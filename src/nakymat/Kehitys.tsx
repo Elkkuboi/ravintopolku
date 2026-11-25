@@ -176,7 +176,7 @@ function Yhteenveto({
 
 function tavoiteLause({ taytti, paivia }: { taytti: number; paivia: number }) {
   return paivia
-    ? `Tavoite täyttyi ${taytti} päivänä ${elatiivi(paivia)}.`
+    ? `Tavoitealueella ${taytti} päivänä ${elatiivi(paivia)}.`
     : "Ei vielä valmiita päiviä.";
 }
 

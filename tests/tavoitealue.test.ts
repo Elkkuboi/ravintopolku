@@ -3,7 +3,17 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { keys, emptyNutrients, stamped, type Goal } from "../src/domain/model";
+import {
+  keys,
+  emptyDataset,
+  emptyNutrients,
+  stamped,
+  type Dataset,
+  type Goal,
+} from "../src/domain/model";
+import { addDays, localDay } from "../src/domain/dates";
+import Kehitys from "../src/nakymat/Kehitys";
+import { meal } from "./fixtures";
 import {
   TAVOITEALUE,
   aggregate,
@@ -181,14 +191,18 @@ describe("mittarin tekstit", () => {
   };
 
   it("otsikossa yksi tavoite ja sen alue; ilman aluetta vain tavoite", () => {
-    const { r, a } = lue(1000);
-    expect(nbsp(energiaTavoite(r, a))).toBe("tavoite 2 300 (2 070–2 530) kcal");
-    const nolla = meterReading(total(10), 0);
-    expect(energiaTavoite(nolla, asteikko("energy", nolla))).toBe(
-      "tavoite 0 kcal",
+    expect(nbsp(energiaTavoite(lue(1000).r))).toBe(
+      "tavoite 2 300 (2 070–2 530) kcal",
     );
-    const ilman = meterReading(total(10), null);
-    expect(energiaTavoite(ilman, null)).toBe("ei tavoitetta");
+    // alue riippuu vain tavoitteesta: sama otsikko tyhjänä päivänä ja kun energiaa ei tiedetä
+    expect(nbsp(energiaTavoite(lue(null, 0, 0).r))).toBe(
+      "tavoite 2 300 (2 070–2 530) kcal",
+    );
+    expect(nbsp(energiaTavoite(lue(null, 0, 1).r))).toBe(
+      "tavoite 2 300 (2 070–2 530) kcal",
+    );
+    expect(energiaTavoite(meterReading(total(10), 0))).toBe("tavoite 0 kcal");
+    expect(energiaTavoite(meterReading(total(10), null))).toBe("ei tavoitetta");
   });
 
   it("jäljellä ja yli lasketaan aina yhdestä tavoitteesta; luokka kertoo osuman", () => {
@@ -209,6 +223,10 @@ describe("mittarin tekstit", () => {
     expect(jaljella(2600, 3, 1)).toEqual(["yli 300", "yli"]);
     expect(jaljella(null, 0, 0)).toEqual(["2 300 jäljellä", null]);
     expect(jaljella(null, 0, 2)).toBeNull();
+    // teksti lasketaan näytetyistä luvuista: 2 300,4 näkyy 2 300:na eikä ole "yli 0"
+    expect(jaljella(2300.4)).toEqual(["0 jäljellä", "osui"]);
+    expect(jaljella(2300.6)).toEqual(["yli 1", "osui"]);
+    expect(jaljella(2299.6)).toEqual(["0 jäljellä", "osui"]);
   });
 
   it("makrorivin luku kahtena osana on sama teksti kuin ennen", () => {
@@ -246,6 +264,50 @@ describe("mittarin tekstit", () => {
     expect(mittariTeksti(p, asteikko("protein", p), "g")).toBe(
       "150 g, tavoite 140 g, tavoitealueella",
     );
+  });
+});
+
+describe("Kehitys-sivun tavoitepäivät", () => {
+  const piirra = (data: Dataset) =>
+    renderToStaticMarkup(
+      createElement(Kehitys, {
+        data,
+        notify: () => {},
+        run: async (f: () => Promise<void>) => f(),
+      }),
+    );
+  // fixtures.meal: 15 g proteiinia. Tavoite 16 g: alue alkaa 14 g:sta, joten 15 g on alueella mutta alle tavoitteen.
+  const data = (proteiini: number): Dataset => {
+    const end = localDay();
+    const d = emptyDataset();
+    d.goals = [
+      {
+        ...stamped(),
+        effectiveDate: addDays(end, -30),
+        kind: "track",
+        targetWeight: null,
+        targetDate: null,
+        nutrients: { ...emptyNutrients(), protein: proteiini },
+      },
+    ];
+    d.meals = [meal(addDays(end, -2)), meal(addDays(end, -1))];
+    return d;
+  };
+
+  it("päivä alueella mutta alle tavoitteen lasketaan; lause nimeää alueen", () => {
+    expect(tavoitealue("protein", 16)).toEqual({ ala: 14, yla: null });
+    const html = piirra(data(16));
+    expect(html).toContain("tavoite 16 g");
+    expect(html).toContain("Tavoitealueella 2 päivänä 2:sta.");
+    expect(html).not.toContain("Tavoite täyttyi");
+  });
+
+  it("päivä alueen alla ei osu; nollatavoitteella lausetta ei ole", () => {
+    expect(tavoitealue("protein", 18)).toEqual({ ala: 16, yla: null });
+    expect(piirra(data(18))).toContain("Tavoitealueella 0 päivänä 2:sta.");
+    const nolla = piirra(data(0));
+    expect(nolla).not.toContain("Tavoitealueella");
+    expect(nolla).not.toContain("Ei vielä valmiita päiviä");
   });
 });
 

@@ -65,7 +65,7 @@ describe("PromptiLista", () => {
     expect(piirra(null)).toBe("");
     expect(piirra("haetaan")).toBe('<p class="empty">Haetaan…</p>');
     expect(piirra("virhe")).toBe(
-      '<p class="empty">Prompteja ei saatu työasemalta.</p>',
+      '<p class="empty">Prompteja ei saatu palvelimelta.</p>',
     );
   });
 });
