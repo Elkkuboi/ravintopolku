@@ -70,7 +70,8 @@ Testi tarkistaa:
 `palvelin/tests/test_asennus.py` ajaa asennusskriptin väliaikaisessa juuressa valekomennoilla (Docker, systemd, uv):
 onnistunut asennus, paluu edelliseen versioon kun palvelimen asennus tai käynnistys pettää, `--vain-sovellus`,
 isännän lisäryhmän säilyminen, keskeytys (Ctrl-C tai katkennut yhteys) myös uuden version jo käynnistyttyä ja
-kahdesti peräkkäin, kesken jääneen ajon varakopio ja se, ettei puuttuva Python ehdi muuttaa mitään. Tuotanto ajaa
+kahdesti peräkkäin, kesken jääneen ajon varakopio, se, ettei puuttuva Python ehdi muuttaa mitään, ja se, että
+`--vain-sovellus` pysähtyy, kun palvelimen koodi on muuttunut asennetun commitin jälkeen. Tuotanto ajaa
 Python 3.14:ää: aja palvelimen testit ennen yhdistämistä myös sillä (`uv run --python 3.14 --frozen pytest -q`).
 
 Muut `palvelin/tests/`: tunnistus ja turvaotsakkeet, synkronointi, luonnoslaatikko, kuvan tulkinta (700 kt:n raja,

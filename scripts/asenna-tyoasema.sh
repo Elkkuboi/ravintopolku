@@ -10,6 +10,8 @@
 #
 #   --vain-sovellus: kääntää ja testaa kuten aina, mutta vaihtaa vain hakemiston dist/ ja tiedoston DEPLOYED. Palvelinta,
 #   palvelutiedostoa eikä asetuksia kosketa, eikä palvelua pysäytetä (palvelin lukee dist/:n jokaisella pyynnöllä).
+#   Jos palvelimen koodi (palvelin/src, uv.lock) on muuttunut asennetun commitin jälkeen, skripti pysähtyy ja pyytää
+#   täyden asennuksen: sovellus ja palvelin eivät saa jäädä eri versioihin.
 #
 #   - Vain commitoitu koodi (git archive HEAD). Likainen työpuu pysäyttää asennuksen.
 #   - Kolme konttiajoa samasta tiivisteellä kiinnitetystä Node-imagesta, käyttäjänä 1000, ilman oikeuksia
@@ -81,6 +83,18 @@ if [ -n "$("${GIT[@]}" status --porcelain)" ]; then
   echo "Repossa on tallentamattomia muutoksia. Commitoi ensin: asennetaan vain commitoitu koodi." >&2
   "${GIT[@]}" status --short >&2
   exit 1
+fi
+
+# --vain-sovellus jättää palvelimen ennalleen. Jos palvelimen koodi tai lukitut riippuvuudet ovat muuttuneet asennetun
+# version jälkeen, sovellus ja palvelin jäisivät eri versioihin (sovellus voi pyytää kenttää, jota vanha palvelin ei
+# tunne). Vertailu tehdään, kun DEPLOYED nimeää commitin, joka on tässä repossa; muuten eroa ei voida tietää.
+if [ "$VAIN_SOVELLUS" -eq 1 ] && [ -f "$TARGET/DEPLOYED" ]; then
+  ASENNETTU="$(cut -d' ' -f1 "$TARGET/DEPLOYED")"
+  if [[ "$ASENNETTU" =~ ^[0-9a-f]{7,40}$ ]] && "${GIT[@]}" cat-file -e "$ASENNETTU^{commit}" 2>/dev/null \
+     && ! "${GIT[@]}" diff --quiet "$ASENNETTU" HEAD -- palvelin/src palvelin/uv.lock; then
+    echo "Palvelimen koodi on muuttunut asennetun version ($ASENNETTU) jälkeen, joten pelkkä sovellus ei riitä: sovellus ja palvelin jäisivät eri versioihin. Mitään ei muutettu. Aja täysi asennus: sudo scripts/asenna-tyoasema.sh UV_POLKU" >&2
+    exit 1
+  fi
 fi
 
 COMMIT="$("${GIT[@]}" rev-parse --short HEAD)"
