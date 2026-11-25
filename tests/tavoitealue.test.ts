@@ -15,7 +15,7 @@ import { addDays, localDay } from "../src/domain/dates";
 import Kehitys from "../src/nakymat/Kehitys";
 import { meal } from "./fixtures";
 import {
-  TAVOITEALUE,
+  OLETUSALUEET,
   aggregate,
   osuma,
   tavoitealue,
@@ -52,10 +52,10 @@ describe("tavoitealueen sääntö", () => {
 
   it("jokaisella ravintoaineella on sääntö, ja tavoite on aina alueen sisällä", () => {
     for (const k of keys) {
-      const { ala, yla } = TAVOITEALUE[k];
-      expect(ala).toBeGreaterThan(0);
-      expect(ala).toBeLessThan(1);
-      if (yla !== null) expect(yla).toBeGreaterThan(1);
+      const { alle, yli } = OLETUSALUEET[k];
+      expect(alle).toBeGreaterThan(0);
+      expect(alle).toBeLessThan(100);
+      if (yli !== null) expect(yli).toBeGreaterThan(0);
       expect(osuma(100, tavoitealue(k, 100))).toBe("sisalla");
     }
   });

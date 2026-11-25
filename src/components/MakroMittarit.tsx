@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { labels, type Goal } from "../domain/model";
-import { type Totals } from "../domain/nutrition";
+import { tavoitteenAlueet, type Totals } from "../domain/nutrition";
 import {
   makroKeys,
   meterReading,
@@ -15,7 +15,8 @@ import {
   type MeterReading,
 } from "./makromittarit";
 // Päivän energia isona lukuna ja mittarina, makrot neljänä rivinä tavoitetta vasten. Tavoite on yksi luku; palkin
-// pääty on tavoitealue (päivän hyväksytty vaihtelu, domain/nutrition.ts), ja alueelle osunut luku vihertää. Osittainen
+// pääty on tavoitealue (päivän hyväksytty vaihtelu: tavoitteen omat alueet tai oletukset, domain/nutrition.ts), ja
+// alueelle osunut luku vihertää. Osittainen
 // summa merkitään, eikä tuntematonta arvoa näytetä nollana. Reactin style-prop asettaa vain mittarin osien leveyden
 // ja paikan (CSP sallii CSSOM:n).
 export function MakroMittarit({
@@ -25,13 +26,14 @@ export function MakroMittarit({
   totals: Totals;
   goal: Goal | undefined;
 }) {
+  const alueet = tavoitteenAlueet(goal);
   const energia = meterReading(totals.energy, goal?.nutrients.energy);
-  const alue = asteikko("energy", energia);
+  const alue = asteikko("energy", energia, alueet);
   const jaljella = energiaJaljella(energia, alue);
   return (
     <section aria-label="Energia ja makrot">
       <h2 className="label">
-        Energia <span className="aside">{energiaTavoite(energia)}</span>
+        Energia <span className="aside">{energiaTavoite(energia, alueet)}</span>
       </h2>
       <div className="figure">
         <span
@@ -56,7 +58,7 @@ export function MakroMittarit({
       <dl className="macros">
         {makroKeys.map((k) => {
           const r = meterReading(totals[k], goal?.nutrients[k]);
-          const a = asteikko(k, r);
+          const a = asteikko(k, r, alueet);
           const [syoty, loppu] = makroOsat(r);
           return (
             <Fragment key={k}>

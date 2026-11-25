@@ -58,6 +58,28 @@ export const profileSchema = z
 export type Profile = z.infer<typeof profileSchema>;
 // Copies made during the profile preview can contain this unused local identifier.
 const legacyDiary = { profiiliId: z.string().min(1).optional() };
+// Tavoitealue: kuinka monta prosenttia päivä saa jäädä alle tavoitteen (alle) ja mennä sen yli (yli), jotta se
+// lasketaan vielä osumaksi. Kokonaisia prosentteja; yli null = ei ylärajaa ("vähintään"-tavoite). Samat rajat
+// tarkistaa palvelin tavoite-ehdotuksessa (palvelin/src/ravintopolku_palvelin/tavoitteet.py).
+export const ALLE_MAX = 50,
+  YLI_MAX = 100;
+export const alueSchema = z
+  .object({
+    alle: z.number().int().min(0).max(ALLE_MAX),
+    yli: z.number().int().min(0).max(YLI_MAX).nullable(),
+  })
+  .strict();
+export type Alue = z.infer<typeof alueSchema>;
+export const alueetSchema = z
+  .object({
+    energy: alueSchema,
+    protein: alueSchema,
+    carbs: alueSchema,
+    fat: alueSchema,
+    fiber: alueSchema,
+  })
+  .strict();
+export type Alueet = z.infer<typeof alueetSchema>;
 export const goalSchema = z
   .object({
     ...stamp,
@@ -66,6 +88,9 @@ export const goalSchema = z
     targetWeight: z.number().min(10).max(500).nullable(),
     targetDate: daySchema.nullable(),
     nutrients: nutrientsSchema,
+    // Tavoitealueet (Asetukset tai Ilmarin ehdotus). Puuttuu vanhoista tavoitteista: silloin oletusalueet
+    // (domain/nutrition.ts OLETUSALUEET).
+    alueet: alueetSchema.optional(),
     ...legacyDiary,
   })
   .strict()

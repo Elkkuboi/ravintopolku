@@ -3,18 +3,23 @@
 // Elias kirjoittaa tavoitteensa sanoin ("painon lievä pudotus"), ja Ilmari ehdottaa päivän energia- ja makrotavoitteet
 // sekä lyhyen perustelun. Ehdotus näytetään tarkistettavaksi: vasta hyväksytyt luvut tallentuvat päivän tavoitteeksi.
 // Numerot tarkistetaan koodissa täällä ja palvelimella (palvelin/src/ravintopolku_palvelin/tavoitteet.py). Käyttäjä
-// näkee vain lyhyen suomenkielisen virheen; tekninen syy jää palvelimen lokiin. Sama tiedosto muodostaa myös
-// Asetusten tavoitelomakkeen tallentaman tavoitteen (tavoiteLomakkeesta).
+// näkee vain lyhyen suomenkielisen virheen; tekninen syy jää palvelimen lokiin. Ehdotukseen kuuluvat myös tavoitealueet
+// (kuinka monta prosenttia alle ja yli tavoitteen päivä saa mennä): malli valitsee ne tavoitteen mukaan, ja ne
+// tallentuvat tavoitteen mukana. Sama tiedosto muodostaa myös Asetusten tavoitelomakkeen tallentaman tavoitteen
+// (tavoiteLomakkeesta).
 import { z } from "zod";
 import { apiURL } from "./client";
 import {
+  type Alueet,
   type Goal,
   type Nutrients,
   type Profile,
   PAINO_MAX,
   PAINO_MIN,
+  alueSchema,
   stamped,
 } from "../domain/model";
+import { OLETUSALUEET } from "../domain/nutrition";
 
 export const tavoiteRooliSchema = z.enum([
   "tavoite_ehdottaja",
@@ -52,9 +57,20 @@ export const ehdotusSchema = z
     fat: rajattu("fat"),
   })
   .strict();
+/** Ehdotuksen tavoitealueet: samat neljä lukua kuin ehdotuksessa. Kuitu ei kuulu ehdotukseen. */
+export const ehdotetutAlueetSchema = z
+  .object({
+    energy: alueSchema,
+    protein: alueSchema,
+    carbs: alueSchema,
+    fat: alueSchema,
+  })
+  .strict();
+export type EhdotetutAlueet = z.infer<typeof ehdotetutAlueetSchema>;
 export const vastausSchema = z
   .object({
     ehdotus: ehdotusSchema,
+    alueet: ehdotetutAlueetSchema,
     perustelu: z.string().max(400),
     oletukset: z.array(z.string().max(300)).max(10),
     rooli: tavoiteRooliSchema,
@@ -91,10 +107,13 @@ export async function ehdotaTavoitteet(
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", "X-Ravintopolku": "1" },
+      // alueet: true pyytää vastaukseen myös tavoitealueet. Ilman sitä palvelin vastaa vanhassa muodossa, jotta
+      // välimuistissa oleva vanha sovellusversio toimii päivitykseen asti.
       body: JSON.stringify({
         teksti: puhdas,
         rooli: OLETUSROOLI,
         profiili: profiili.trim().slice(0, PROFIILI_MAX),
+        alueet: true,
       }),
     });
   } catch {
@@ -183,14 +202,22 @@ export function tarkistaRajat(arvot: Nutrients): void {
     throw new Error(`${viat.join("; ")}. Säädä luvut äärirajojen sisälle.`);
 }
 
+/** Tallennettavat alueet: annetut, muuten voimassa olevan tavoitteen omat; ilman kumpaakaan kenttää ei kirjoiteta. */
+const alueKentta = (alueet: Alueet | undefined, nykyinen?: Goal) => {
+  const a = alueet ?? nykyinen?.alueet;
+  return a ? { alueet: a } : {};
+};
+
 /**
- * Hyväksytty ehdotus päivän tavoitteeksi. Kuitu ei kuulu ehdotukseen, joten se säilyy ennallaan; painotavoite ja
- * sen päivämäärä peritään voimassa olevalta tavoitteelta, joten niiden kanssa ei tingata.
+ * Hyväksytty ehdotus päivän tavoitteeksi. Kuitu ei kuulu ehdotukseen, joten se ja sen tavoitealue säilyvät
+ * ennallaan; painotavoite ja sen päivämäärä peritään voimassa olevalta tavoitteelta, joten niiden kanssa ei tingata.
+ * Ehdotuksen tavoitealueet tallentuvat tavoitteen mukana.
  */
 export function hyvaksyTavoite(
   arvot: Nutrients,
   pvm: string,
   current?: Goal,
+  alueet?: EhdotetutAlueet,
 ): Goal {
   return {
     ...stamped(),
@@ -198,6 +225,13 @@ export function hyvaksyTavoite(
     kind: current?.kind ?? "track",
     targetWeight: current?.targetWeight ?? null,
     targetDate: current?.targetDate ?? null,
+    ...alueKentta(
+      alueet && {
+        ...alueet,
+        fiber: current?.alueet?.fiber ?? OLETUSALUEET.fiber,
+      },
+      current,
+    ),
     nutrients: {
       energy: arvot.energy,
       protein: arvot.protein,
@@ -212,12 +246,14 @@ export function hyvaksyTavoite(
  * Asetusten tavoitelomake: energia, makrot, kuitu ja tavoitepaino tämän päivän tavoitteeksi. Tavoitetyyppi ja
  * tavoitepäivä, joita lomake ei näytä, peritään voimassa olevalta tavoitteelta. Jos tavoitepaino tyhjennetään,
  * painon pudotus- tai nostotavoite muuttuu pelkäksi seurannaksi (skeema vaatii niiltä painon ja päivän).
+ * Tavoitealueet tulevat lomakkeesta; ilman niitä voimassa olevan tavoitteen alueet säilyvät.
  */
 export function tavoiteLomakkeesta(
   arvot: Nutrients,
   tavoitepaino: number | null,
   pvm: string,
   nykyinen?: Goal,
+  alueet?: Alueet,
 ): Goal {
   if (
     tavoitepaino !== null &&
@@ -234,6 +270,7 @@ export function tavoiteLomakkeesta(
         : (nykyinen?.kind ?? "track"),
     targetWeight: tavoitepaino,
     targetDate: tavoitepaino === null ? null : (nykyinen?.targetDate ?? null),
+    ...alueKentta(alueet, nykyinen),
     nutrients: { ...arvot },
   };
 }

@@ -12,3 +12,11 @@
 
 /* Tekstin sisäinen linkki: pystytäyte kasvattaa kosketusalueen 44 px:iin muuttamatta riviä. */
 p.muted > a { padding: .8rem 0; }
+
+/* Tavoitealue: rivi = nimi (alla alue yksikköinä) ja kaksi prosenttikenttää. Ehdotuksen alueet luettelona. */
+.alueet > * + * { margin-top: .5rem; }
+.alue-rivi { display: grid; grid-template-columns: minmax(0, 1fr) 4rem 4rem; gap: 0 1rem; align-items: center; }
+.alue-rivi input { width: 100%; }
+.alue-rivi small { display: block; font-variant-numeric: tabular-nums; }
+.alue-lista { padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.stack > .alue-lista { margin-top: 0; }

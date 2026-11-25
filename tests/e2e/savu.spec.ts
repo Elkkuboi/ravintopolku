@@ -45,8 +45,24 @@ const LUONNOS = {
 };
 
 type Kuva = "ok" | "virhe" | "hidas";
+/** Tavoite-ehdotus palvelimelta: luvut ja tavoitealueet rasvaa pudottavalle (ylitys tiukalla). */
+const EHDOTUS = {
+  ehdotus: { energy: 2100, protein: 150, carbs: 220, fat: 60 },
+  alueet: {
+    energy: { alle: 10, yli: 5 },
+    protein: { alle: 5, yli: null },
+    carbs: { alle: 20, yli: 10 },
+    fat: { alle: 20, yli: 10 },
+  },
+  perustelu: "Kevyt alijäämä ja runsas proteiini.",
+  oletukset: ["Kolme ateriaa päivässä"],
+  rooli: "tavoite_ehdottaja",
+  malli: "testimalli",
+};
+
 /**
- * Mockattu palvelin: värireitti, synkronointi, luonnoslaatikko ja kuvan tulkinta. Muut reitit 404 (näkyy konsolissa).
+ * Mockattu palvelin: värireitti, synkronointi, luonnoslaatikko, kuvan tulkinta ja tavoite-ehdotus. Muut reitit 404
+ * (näkyy konsolissa).
  * Kuvareitin vastausta voi vaihtaa kesken testin (tila.kuva); "hidas" vastaa onnistuneesti 1,5 s:n päästä.
  */
 async function palvelin(
@@ -74,6 +90,7 @@ async function palvelin(
     if (polku === "/api/synk")
       return json(200, { muutokset: [], lisaa: false, seq: 0 });
     if (polku === "/api/luonnokset") return json(200, { luonnokset });
+    if (polku === "/api/tavoitteet") return json(200, EHDOTUS);
     if (polku === "/api/kuva-ateria") {
       if (tila.kuva === "hidas") await new Promise((r) => setTimeout(r, 1500));
       return tila.kuva === "virhe"
@@ -350,6 +367,121 @@ test("tavoitealue: palkin pääty ja tavoitteen merkki näkyvät, alueelle osunu
   expect(virheet).toEqual([]);
 });
 
+test("tavoitealueen säätö: prosentit Asetuksissa, alue näkyy heti ja Tänään-sivulla, tallennus säilyy", async ({
+  page,
+}) => {
+  const virheet = await valvo(page);
+  await palvelin(page);
+  await page.goto("/#asetukset");
+  await page.getByLabel("Energia kcal").fill("2000");
+  await page.getByLabel("Rasva g").fill("60");
+  const lomake = page.locator("form.lomake").first();
+  await lomake.getByText("Tavoitealue", { exact: true }).click();
+  const kentta = (nimi: string) => lomake.getByLabel(nimi, { exact: true });
+  const energiaYli = kentta("Energia: yli tavoitteen, prosenttia"),
+    rasvaYli = kentta("Rasva: yli tavoitteen, prosenttia");
+  // oletukset näkyvät, ja alue yksikköinä seuraa lomakkeen lukuja
+  await expect(kentta("Energia: alle tavoitteen, prosenttia")).toHaveValue(
+    "10",
+  );
+  await expect(energiaYli).toHaveValue("10");
+  await expect(kentta("Proteiini: yli tavoitteen, prosenttia")).toHaveValue("");
+  const rivi = (nimi: string) =>
+    lomake.locator(".alue-rivi", { hasText: nimi }).locator("small");
+  await expect(rivi("Energia")).toHaveText("1 800–2 200 kcal");
+  await energiaYli.fill("5");
+  await expect(rivi("Energia")).toHaveText("1 800–2 100 kcal");
+  await rasvaYli.fill("0");
+  await expect(rivi("Rasva")).toHaveText("48–60 g");
+  // kelvoton prosentti: mitään ei tallenneta, virhe nimeää rivin
+  await rasvaYli.fill("paljon");
+  const tallenna = lomake.getByRole("button", { name: "Tallenna" });
+  await tallenna.click();
+  await expect(lomake.getByRole("alert")).toContainText(
+    "Tavoitealue, rasva: alle 0–50 ja yli 0–100",
+  );
+  await rasvaYli.fill("0");
+  await tallenna.click();
+  await expect(page.getByText("Tavoitteet tallennettu.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Tänään" }).click();
+  await expect(page.locator(".label .aside").first()).toHaveText(
+    "tavoite 2 000 (1 800–2 100) kcal",
+  );
+  // rasvan tavoite on katto: merkki on palkin oikeassa reunassa
+  const rasva = page.getByRole("meter", { name: "Rasva tavoitteesta" });
+  const palkki = (await rasva.boundingBox())!,
+    merkki = (await rasva.locator(".meter-tavoite").boundingBox())!;
+  expect(merkki.x + merkki.width).toBeGreaterThan(palkki.x + palkki.width - 3);
+
+  // uudelleenlatauksen jälkeen lomake näyttää tallennetut prosentit
+  await page.reload();
+  await page.getByRole("link", { name: "Asetukset" }).click();
+  await page
+    .locator("form.lomake")
+    .first()
+    .getByText("Tavoitealue", { exact: true })
+    .click();
+  await expect(energiaYli).toHaveValue("5");
+  await expect(rasvaYli).toHaveValue("0");
+  await expect(
+    kentta("Hiilihydraatit: yli tavoitteen, prosenttia"),
+  ).toHaveValue("20");
+  expect(virheet).toEqual([]);
+});
+
+test("tavoite-ehdotus tuo tavoitealueet: ne näkyvät ehdotuksessa ja tallentuvat käyttöönotossa", async ({
+  page,
+}) => {
+  const virheet = await valvo(page);
+  const { pyynnot } = await palvelin(page);
+  await page.goto("/#asetukset");
+  await page.getByText("Ehdota tavoitteet omin sanoin").click();
+  await page
+    .getByLabel("Tavoite omin sanoin")
+    .fill("haluan pudottaa rasvaprosenttia");
+  await page.getByRole("button", { name: "Ehdota", exact: true }).click();
+  await expect(
+    page.getByText("Kevyt alijäämä ja runsas proteiini."),
+  ).toBeVisible();
+  const pyynto = pyynnot.find((p) => p.polku === "/api/tavoitteet")!;
+  expect(JSON.parse(pyynto.runko!.toString("utf8"))).toMatchObject({
+    teksti: "haluan pudottaa rasvaprosenttia",
+    alueet: true,
+  });
+  const alueet = page.getByRole("list", { name: "Tavoitealue" });
+  await expect(alueet.getByRole("listitem")).toHaveText([
+    "Energia: 1 890–2 205 kcal, −10/+5 %",
+    "Proteiini: vähintään 143 g, −5 %",
+    "Hiilihydraatit: 176–242 g, −20/+10 %",
+    "Rasva: 48–66 g, −20/+10 %",
+  ]);
+  // luvun muokkaus ehdotuksessa päivittää alueen heti
+  const ehdotus = page.locator("details.fold", {
+    hasText: "Ehdota tavoitteet omin sanoin",
+  });
+  await ehdotus.getByLabel("Energia kcal").fill("2000");
+  await expect(alueet.getByRole("listitem").first()).toHaveText(
+    "Energia: 1 800–2 100 kcal, −10/+5 %",
+  );
+  await ehdotus.getByRole("button", { name: "Ota käyttöön" }).click();
+  await expect(page.getByText("Tavoitteet tallennettu.")).toBeVisible();
+
+  // käyttöönoton jälkeen samat prosentit ovat säädettävissä lomakkeessa; kuitu sai oletuksen
+  const lomake = page.locator("form.lomake").first();
+  await lomake.getByText("Tavoitealue", { exact: true }).click();
+  const arvo = (nimi: string) => lomake.getByLabel(nimi, { exact: true });
+  await expect(arvo("Energia: yli tavoitteen, prosenttia")).toHaveValue("5");
+  await expect(arvo("Proteiini: alle tavoitteen, prosenttia")).toHaveValue("5");
+  await expect(arvo("Rasva: yli tavoitteen, prosenttia")).toHaveValue("10");
+  await expect(arvo("Kuitu: alle tavoitteen, prosenttia")).toHaveValue("10");
+  await page.getByRole("link", { name: "Tänään" }).click();
+  await expect(page.locator(".label .aside").first()).toHaveText(
+    "tavoite 2 000 (1 800–2 100) kcal",
+  );
+  expect(virheet).toEqual([]);
+});
+
 test("kuvakentät: kamera ja galleria erikseen, capture vain kamerassa", async ({
   page,
 }) => {
@@ -454,12 +586,18 @@ test("Peru keskeyttää tulkinnan: myöhästynyt vastaus ei avaa luonnosta eikä
   await page.getByRole("button", { name: "Tulkitse kuva" }).click();
   await expect(page.getByText("Tulkitaan", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Peru" }).click();
-  await expect(page.getByRole("button", { name: "Tulkitse kuva" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Tulkitse kuva" }),
+  ).toBeVisible();
   await page.waitForTimeout(2000); // mockin 1,5 s:n vastaus on ohi
   await expect(page.getByRole("heading", { name: /^Sisältö/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Tulkitse kuva" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Tulkitse kuva" }),
+  ).toBeVisible();
   await page.locator("a.back", { hasText: "Tänään" }).click();
-  await expect(page.getByRole("region", { name: "Lisää ateria" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Lisää ateria" }),
+  ).toBeVisible();
   await expect(page.locator("button.meal")).toHaveCount(0);
   expect(pyynnot.filter((p) => p.polku === "/api/kuva-ateria")).toHaveLength(1);
   expect(virheet).toEqual([]);
@@ -492,7 +630,9 @@ test("luonnos säilyy sivun vaihdon yli; yläpalkin Tänään kysyy kuten Hylkä
   await expect(nimi).toHaveValue("Kana-riisi");
   page.once("dialog", (d) => void d.accept());
   await yla.getByRole("link", { name: "Tänään" }).click();
-  await expect(page.getByRole("region", { name: "Lisää ateria" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Lisää ateria" }),
+  ).toBeVisible();
   await expect(page.locator("button.meal")).toHaveCount(0);
   expect(virheet).toEqual([]);
 });

@@ -6,6 +6,7 @@ import {
   type NutrientKey,
   type Meal,
   type Goal,
+  type Alueet,
 } from "./model";
 export interface Total {
   value: number | null;
@@ -63,21 +64,23 @@ export const goalForDay = (goals: Goal[], date: string): Goal | undefined =>
         b.updatedAt.localeCompare(a.updatedAt),
     )[0];
 /**
- * Tavoitealue: päivän hyväksytty vaihtelu yhden tavoitteen ympärillä osuutena tavoitteesta. Tavoite on yhä yksi
- * luku, ja jakson keskiarvo ratkaisee; yksittäinen päivä on kohinaa sen ympärillä. Energia on kaksisuuntainen
- * (±10 % on noin yhden treenin kulutus ja yhden päivän kirjaustarkkuus), hiilihydraatit ja rasva väljemmin (±20 %),
- * koska ne korvaavat toisiaan energian sisällä. Proteiini ja kuitu ovat "vähintään": ylärajaa ei ole.
+ * Tavoitealue: päivän hyväksytty vaihtelu yhden tavoitteen ympärillä prosentteina tavoitteesta. Tavoite on yhä yksi
+ * luku, ja jakson keskiarvo ratkaisee; yksittäinen päivä on kohinaa sen ympärillä. Alueet kuuluvat tavoitteeseen
+ * (Goal.alueet): ne säädetään Asetuksissa tai Ilmari ehdottaa ne tavoitteen mukana. Nämä oletukset ovat voimassa,
+ * kun tavoitteella ei ole omia: energia on kaksisuuntainen (±10 % on noin yhden treenin kulutus ja yhden päivän
+ * kirjaustarkkuus), hiilihydraatit ja rasva väljemmin (±20 %), koska ne korvaavat toisiaan energian sisällä.
+ * Proteiini ja kuitu ovat "vähintään": ylärajaa ei ole.
  */
-export const TAVOITEALUE: Record<
-  NutrientKey,
-  { ala: number; yla: number | null }
-> = {
-  energy: { ala: 0.9, yla: 1.1 },
-  protein: { ala: 0.9, yla: null },
-  carbs: { ala: 0.8, yla: 1.2 },
-  fat: { ala: 0.8, yla: 1.2 },
-  fiber: { ala: 0.9, yla: null },
+export const OLETUSALUEET: Alueet = {
+  energy: { alle: 10, yli: 10 },
+  protein: { alle: 10, yli: null },
+  carbs: { alle: 20, yli: 20 },
+  fat: { alle: 20, yli: 20 },
+  fiber: { alle: 10, yli: null },
 };
+/** Tavoitteen omat alueet, tai oletukset, kun tavoitetta tai sen alueita ei ole. */
+export const tavoitteenAlueet = (goal: Goal | undefined): Alueet =>
+  goal?.alueet ?? OLETUSALUEET;
 /** Suljettu väli kokonaisina yksikköinä (kcal, g); yla null = ei ylärajaa. */
 export interface Tavoitealue {
   ala: number;
@@ -87,12 +90,16 @@ export interface Tavoitealue {
 export function tavoitealue(
   key: NutrientKey,
   goal: number | null | undefined,
+  alueet: Alueet = OLETUSALUEET,
 ): Tavoitealue | null {
   if (goal === null || goal === undefined || !(goal > 0)) return null;
-  const { ala, yla } = TAVOITEALUE[key];
-  const alaraja = Math.round(goal * ala);
+  const { alle, yli } = alueet[key];
+  const alaraja = Math.round((goal * (100 - alle)) / 100);
   return alaraja > 0
-    ? { ala: alaraja, yla: yla === null ? null : Math.round(goal * yla) }
+    ? {
+        ala: alaraja,
+        yla: yli === null ? null : Math.round((goal * (100 + yli)) / 100),
+      }
     : null;
 }
 export type Osuma = "alle" | "sisalla" | "yli";

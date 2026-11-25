@@ -4,6 +4,8 @@ import {
   goalForDay,
   formatNumber,
   osuma,
+  tavoitealue,
+  tavoitteenAlueet,
   type Tavoitealue,
 } from "../domain/nutrition";
 import { dayDistance, dayRange } from "../domain/dates";
@@ -31,6 +33,8 @@ export interface MacroChart {
   mean: { value: number | null; count: number };
   /** Goal in force on the viewed day; null when there is no goal. */
   goal: number | null;
+  /** Target zone of that goal (the goal's own zones or the defaults); null when there is no goal. */
+  alue: Tavoitealue | null;
 }
 export function macroCharts(
   data: Dataset,
@@ -38,7 +42,9 @@ export function macroCharts(
   days = chartDays,
 ): MacroChart[] {
   const daily = dailySeries(data, end, days);
-  const nutrients = goalForDay(data.goals, end)?.nutrients;
+  const goal = goalForDay(data.goals, end);
+  const nutrients = goal?.nutrients,
+    alueet = tavoitteenAlueet(goal);
   return meterKeys.map((k) => {
     const points = daily.map((d) => ({
       date: d.date,
@@ -53,6 +59,7 @@ export function macroCharts(
       hasData: points.some((p) => p.value !== null),
       mean: observedMean(points.filter((p) => !p.partial).map((p) => p.value)),
       goal: nutrients?.[k] ?? null,
+      alue: tavoitealue(k, nutrients?.[k], alueet),
     };
   });
 }
