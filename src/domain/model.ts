@@ -169,10 +169,19 @@ export const lifestyleSchema = z
     training: text,
     hunger: z.number().int().min(1).max(5).nullable(),
     energy: z.number().int().min(1).max(5).nullable(),
+    // Treenipäivä (Tänään-sivun valinta). Puuttuu vanhoista kirjauksista: puuttuva on sama kuin ei.
+    trainingDay: z.boolean().optional(),
     ...legacyDiary,
   })
   .strict();
 export type Lifestyle = z.infer<typeof lifestyleSchema>;
+/** Päivän kentät, joita Tänään-sivu muuttaa: lomake (uni, liike ja olo) ja treenipäivän valinta erikseen. */
+export type LifestyleFields = Partial<
+  Pick<
+    Lifestyle,
+    "steps" | "sleep" | "training" | "hunger" | "energy" | "trainingDay"
+  >
+>;
 export const dayStatusSchema = z
   .object({ ...stamp, date: daySchema, complete: z.boolean(), ...legacyDiary })
   .strict();

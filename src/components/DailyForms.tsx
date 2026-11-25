@@ -6,7 +6,12 @@ import {
   numberInput,
 } from "../domain/model";
 import { tulkitsePaino } from "../domain/paino";
-import { saveRecord, findWeight, removeWeight } from "../data/db";
+import {
+  saveRecord,
+  saveLifestyle,
+  findWeight,
+  removeWeight,
+} from "../data/db";
 import { Field, Decimal, Form } from "./common";
 import { useFormAction } from "./useFormAction";
 const PAINO_VIRHE = 'Paino ei ole luku. Kirjoita esimerkiksi "82,4".';
@@ -122,9 +127,7 @@ export function LifestyleForm({
       onSubmit={(e) => {
         e.preventDefault();
         void execute(async () => {
-          await saveRecord("lifestyles", {
-            ...stamped(lifestyle),
-            date,
+          await saveLifestyle(date, {
             steps: numberInput(steps, true),
             sleep: numberInput(sleep, true),
             training,

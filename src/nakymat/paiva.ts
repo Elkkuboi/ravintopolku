@@ -1,6 +1,7 @@
 // Tänään-sivun puhtaat apufunktiot: päivän nimi, ateriarivi, edellinen paino ja aterian kopio. Testattavissa ilman
 // selainta.
 import {
+  type Lifestyle,
   type Meal,
   type Photo,
   type Weight,
@@ -82,3 +83,17 @@ export function aterianKopio(
     photo: kuva,
   };
 }
+
+/**
+ * "Uni, liike ja olo" -lomakkeen avain: lomake alkaa alusta vain, kun päivä tai sen kentät muuttuvat muualla
+ * (synkronointi). Treenipäivän napautus ei tyhjennä kesken olevaa lomaketta, ja puuttuva kirjaus on sama kuin tyhjä.
+ */
+export const lomakkeenAvain = (date: string, l?: Lifestyle) =>
+  JSON.stringify([
+    date,
+    l?.steps ?? null,
+    l?.sleep ?? null,
+    l?.training ?? "",
+    l?.hunger ?? null,
+    l?.energy ?? null,
+  ]);

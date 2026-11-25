@@ -131,6 +131,27 @@ async function kuvatiedosto(page: Page) {
   };
 }
 
+/** Päivän kirjaukset (uni, liike ja olo) suoraan selaimen kannasta: [askeleet, treenipäivä] kirjausta kohden. */
+const paivanKirjaukset = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<unknown[]>((valmis, virhe) => {
+        const avaus = indexedDB.open("ravintopolku-v1");
+        avaus.onerror = () => virhe(avaus.error);
+        avaus.onsuccess = () => {
+          const kanta = avaus.result;
+          const haku = kanta
+            .transaction("lifestyles")
+            .objectStore("lifestyles")
+            .getAll();
+          haku.onsuccess = () => {
+            kanta.close();
+            valmis(haku.result.map((l) => [l.steps, l.trainingDay]));
+          };
+        };
+      }),
+  );
+
 const kamera = (page: Page) =>
   page.locator("label.file", { hasText: "Ota kuva" }).locator("input");
 const galleria = (page: Page) =>
@@ -192,6 +213,65 @@ test("käsin kirjaus näkyy summassa ja aukeaa muokattavaksi", async ({
   ).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Sulje" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(virheet).toEqual([]);
+});
+
+test("treenipäivä: napautus tallentuu heti, ei tyhjennä lomaketta ja näkyy Kehityksessä", async ({
+  page,
+}) => {
+  const virheet = await valvo(page);
+  await palvelin(page);
+  await page.goto("/");
+  // ateria, jotta energian kuvaaja piirtyy
+  await page.getByRole("button", { name: "Kirjoita", exact: true }).click();
+  await page.getByLabel(/^1\. /).fill("Kaurapuuro");
+  await page.getByLabel("Energia (kcal)").fill("350");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Tallenna" })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  const treeni = page.getByRole("checkbox", { name: "Treenipäivä" });
+  const taite = page.locator("details.fold");
+  await expect(treeni).not.toBeChecked();
+  // kesken oleva lomake säilyy, kun treenipäivä napautetaan
+  await taite.locator("summary").click();
+  await taite.getByLabel("Askeleet").fill("8000");
+  await treeni.click();
+  await expect(treeni).toBeChecked();
+  await expect(taite.getByLabel("Askeleet")).toHaveValue("8000");
+  await taite.getByRole("button", { name: "Tallenna" }).click();
+  // päivän kirjaus selaimen kannassa: lomakkeen askeleet ja treenipäivä samassa tietueessa
+  await expect.poll(() => paivanKirjaukset(page)).toEqual([[8000, true]]);
+  await page.reload();
+  await expect(treeni).toBeChecked();
+  await taite.locator("summary").click();
+  await expect(taite.getByLabel("Askeleet")).toHaveValue("8000");
+
+  await page.getByRole("link", { name: "Kehitys" }).click();
+  await expect(page.locator(".chart .merkki rect")).toHaveCount(1);
+  await expect(page.getByText("Treenattu 1 päivänä 30:stä.")).toBeVisible();
+  await expect(page.locator(".treeni-merkki")).toHaveCount(1);
+  await page.locator("summary", { hasText: "Päivittäiset luvut" }).click();
+  await expect(page.locator(".luvut td", { hasText: "✓" })).toHaveCount(1);
+  // viikkopylväissä ei päiväviivoja; määrä näkyy silti
+  await page.getByRole("button", { name: "90 pv" }).click();
+  await expect(page.locator(".chart .merkki")).toHaveCount(0);
+  await expect(page.locator(".treeni-merkki")).toHaveCount(0);
+  await expect(page.getByText("Treenattu 1 päivänä 90:stä.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Tänään" }).click();
+  await treeni.click();
+  await expect(treeni).not.toBeChecked();
+  await expect.poll(() => paivanKirjaukset(page)).toEqual([[8000, false]]);
+  await page.reload();
+  await expect(treeni).not.toBeChecked();
+  await page.getByRole("link", { name: "Kehitys" }).click();
+  // ensin Kehitys-sivu piirtyneenä (laiska lataus), vasta sitten puuttuvan merkinnän tarkistus
+  await expect(page.locator(".chart .bar rect")).toHaveCount(1);
+  await expect(page.getByText(/Treenattu/)).toHaveCount(0);
+  await expect(page.locator(".chart .merkki")).toHaveCount(0);
   expect(virheet).toEqual([]);
 });
 

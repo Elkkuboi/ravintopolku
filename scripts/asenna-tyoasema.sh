@@ -5,6 +5,12 @@
 # sekä palvelutiedoston ravintopolku.service (aiops ADR-0016, R2).
 #
 # Käyttö repon juuresta:   sudo scripts/asenna-tyoasema.sh "$(command -v uv)"
+#                          sudo scripts/asenna-tyoasema.sh --vain-sovellus
+#
+#   --vain-sovellus: kääntää ja testaa kuten aina, mutta vaihtaa vain hakemiston dist/ ja tiedoston DEPLOYED. Palvelinta,
+#   palvelutiedostoa eikä asetuksia kosketa, eikä palvelua pysäytetä (palvelin lukee dist/:n jokaisella pyynnöllä).
+#   Käytä, kun muutos koskee vain käyttöliittymää tai kun palvelimen ympäristö poikkeaa tästä skriptistä (Louhi
+#   24.11.2026: palvelimen .venv on rakennettu järjestelmän Pythonilla, eikä /usr/bin/python3.12:ta ole).
 #
 #   - Vain commitoitu koodi (git archive HEAD). Likainen työpuu pysäyttää asennuksen.
 #   - Kolme konttiajoa samasta tiivisteellä kiinnitetystä Node-imagesta, käyttäjänä 1000, ilman oikeuksia
@@ -26,13 +32,22 @@ set -euo pipefail
 IMAGE="node:24.19.0-bookworm-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df"
 TARGET=/opt/ravintopolku
 UNIT=ravintopolku.service
+VAIN_SOVELLUS=0
+if [ "${1:-}" = "--vain-sovellus" ]; then
+  VAIN_SOVELLUS=1
+  shift
+fi
 UV="${1:-}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 GIT=(git -c "safe.directory=$REPO" -C "$REPO")
 
 [ "$(id -u)" -eq 0 ] || { echo "Aja sudolla: sudo scripts/asenna-tyoasema.sh" >&2; exit 1; }
-[ -x "$UV" ] || { echo "Anna uv:n polku: sudo scripts/asenna-tyoasema.sh \"\$(command -v uv)\"" >&2; exit 1; }
-[ $# -le 1 ] || { echo "Tuntematon argumentti: $2" >&2; exit 1; }
+if [ "$VAIN_SOVELLUS" -eq 1 ]; then
+  [ $# -eq 0 ] || { echo "Tuntematon argumentti: $1 (--vain-sovellus ei tarvitse uv:ta)" >&2; exit 1; }
+else
+  [ -x "$UV" ] || { echo "Anna uv:n polku: sudo scripts/asenna-tyoasema.sh \"\$(command -v uv)\"" >&2; exit 1; }
+  [ $# -le 1 ] || { echo "Tuntematon argumentti: $2" >&2; exit 1; }
+fi
 getent passwd ravintopolku >/dev/null || { echo "Käyttäjää ravintopolku ei ole (aiops-muutosloki, vaihe R2)." >&2; exit 1; }
 if [ -n "$("${GIT[@]}" status --porcelain)" ]; then
   echo "Repossa on tallentamattomia muutoksia. Commitoi ensin: asennetaan vain commitoitu koodi." >&2
@@ -76,6 +91,12 @@ chmod -R u=rwX,go=rX "$TARGET/dist.uusi"
 if [ -d "$TARGET/dist" ]; then mv "$TARGET/dist" "$TARGET/dist.vanha"; fi
 mv "$TARGET/dist.uusi" "$TARGET/dist"
 rm -rf "$TARGET/dist.vanha"
+if [ "$VAIN_SOVELLUS" -eq 1 ]; then
+  echo "$COMMIT $(date -Iseconds)" > "$TARGET/DEPLOYED"
+  chmod 0644 "$TARGET/DEPLOYED"
+  echo "Valmis (vain sovellus, palvelin ennallaan): $(cat "$TARGET/DEPLOYED"), $(find "$TARGET/dist" -type f | wc -l) tiedostoa hakemistossa $TARGET/dist"
+  exit 0
+fi
 WAS_ACTIVE=0
 if systemctl is-active --quiet "$UNIT"; then
   WAS_ACTIVE=1
