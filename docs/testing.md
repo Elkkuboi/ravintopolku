@@ -56,7 +56,11 @@ Testi tarkistaa:
 
 ## Palvelin (pytest)
 
-`palvelin/tests/`: tunnistus ja turvaotsakkeet, synkronointi, luonnoslaatikko, kuvan tulkinta (700 kt:n raja,
+`palvelin/tests/test_asennus.py` ajaa asennusskriptin väliaikaisessa juuressa valekomennoilla (Docker, systemd, uv):
+onnistunut asennus, paluu edelliseen versioon kun palvelimen asennus tai käynnistys pettää, `--vain-sovellus`,
+isännän lisäryhmän säilyminen ja se, ettei puuttuva Python ehdi muuttaa mitään.
+
+Muut `palvelin/tests/`: tunnistus ja turvaotsakkeet, synkronointi, luonnoslaatikko, kuvan tulkinta (700 kt:n raja,
 virheteksti ilman välittäjän tekstiä), tavoite-ehdotus, väri (`/api/ulkoasu`), kielimallin ohjeet (`/api/kehotteet`:
 samat tekstit kuin oikeassa kutsussa, vain luku) ja woff2:n MIME-tyyppi.
 
