@@ -56,7 +56,10 @@ export const shortDate = (day: string) =>
 const macroDigits = (k: MeterKey) => (k === "energy" ? 0 : 1);
 // Spoken version of a chart: the SVG has no readable text for the bars, so the
 // numbers are given as text for screen readers.
-export function macroSummary(c: MacroChart): string {
+export function macroSummary(
+  c: MacroChart,
+  treeni: ReadonlySet<string> = new Set(),
+): string {
   const days = c.points.length;
   const values = c.points
     .map(
@@ -67,7 +70,7 @@ export function macroSummary(c: MacroChart): string {
             : `${formatNumber(p.value, macroDigits(c.key))} ${c.unit}${
                 p.partial ? " osittainen" : ""
               }`
-        }`,
+        }${treeni.has(p.date) ? " treenipäivä" : ""}`,
     )
     .join(", ");
   return `${c.label}, ${days} päivän kuvaaja: ${values}. ${
@@ -86,10 +89,14 @@ export type Jakso = (typeof jaksot)[number];
 export const jaksoTeksti = (j: Jakso) =>
   j === "kaikki" ? "Kaikki" : `${j} pv`;
 
-/** Days in the period. "kaikki" reaches back to the first meal or weight, but is never shorter than a week. */
+/** Days in the period. "kaikki" reaches back to the first meal, weight or training day, but is never shorter than a week. */
 export function jaksonPituus(data: Dataset, end: string, jakso: Jakso): number {
   if (jakso !== "kaikki") return jakso;
-  const ensimmainen = [...data.meals, ...data.weights]
+  const ensimmainen = [
+    ...data.meals,
+    ...data.weights,
+    ...data.lifestyles.filter((l) => l.trainingDay),
+  ]
     .map((r) => r.date)
     .filter((d) => d <= end)
     .sort()[0];
@@ -140,6 +147,52 @@ export function tavoitePaivat(
     }
   }
   return { taytti, paivia };
+}
+
+/** Days marked as training days on the Tänään page. */
+export const treenipaivat = (data: Dataset): Set<string> =>
+  new Set(data.lifestyles.filter((l) => l.trainingDay).map((l) => l.date));
+
+export interface TreeniYhteenveto {
+  /** Days in the period and training days among them. */
+  paivia: number;
+  treeni: number;
+  /** Energy means on training days and on the other days, as in jaksonKeskiarvo (final, fully known days). */
+  treenipaivina: { value: number | null; count: number };
+  muina: { value: number | null; count: number };
+}
+
+/** Training days of the period and the mean energy on training days versus the other days. */
+export function treeniYhteenveto(
+  data: Dataset,
+  end: string,
+  points: MacroPoint[],
+): TreeniYhteenveto {
+  const t = treenipaivat(data);
+  const treeni = points.filter((p) => t.has(p.date)),
+    muut = points.filter((p) => !t.has(p.date));
+  return {
+    paivia: points.length,
+    treeni: treeni.length,
+    treenipaivina: jaksonKeskiarvo(data, end, treeni),
+    muina: jaksonKeskiarvo(data, end, muut),
+  };
+}
+
+/** "Treenattu 9 päivänä 30:stä. Energian keskiarvo treenipäivinä 2 450 kcal (8 pv), muina päivinä 2 180 kcal (19 pv)." */
+export function treeniLause(y: TreeniYhteenveto): string {
+  const ka = (m: { value: number | null; count: number }, missa: string) =>
+    m.value === null
+      ? null
+      : `${missa} ${formatNumber(m.value, 0)} kcal (${m.count}\u00a0pv)`;
+  const osat = [
+    ka(y.treenipaivina, "treenipäivinä"),
+    ka(y.muina, "muina päivinä"),
+  ].filter(Boolean);
+  return (
+    `Treenattu ${y.treeni} päivänä ${elatiivi(y.paivia)}.` +
+    (osat.length ? ` Energian keskiarvo ${osat.join(", ")}.` : "")
+  );
 }
 
 /**

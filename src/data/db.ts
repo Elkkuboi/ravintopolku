@@ -9,10 +9,12 @@ import {
   type MealTemplate,
   type Weight,
   type Lifestyle,
+  type LifestyleFields,
   type DayStatus,
   type Settings,
   type Dataset,
   emptyDataset,
+  stamped,
   mealSchema,
   foodSchema,
   weightSchema,
@@ -103,6 +105,35 @@ export async function saveGoal(goal: Goal, database = db) {
       .first();
     if (existing) await database.goals.delete(existing.id);
     await database.goals.put(g);
+  });
+}
+/**
+ * Päivän uni, liike ja olo sekä treenipäivä ovat samassa kirjauksessa (yksi päivää kohden). Tallennus lukee päivän
+ * kirjauksen transaktiossa ja muuttaa vain annetut kentät: treenipäivän napautus ei kumoa lomaketta eikä lomake
+ * treenipäivää, ja synkronoinnista tullut kirjaus päivitetään eikä sen rinnalle yritetä toista samalle päivälle.
+ */
+export async function saveLifestyle(
+  date: string,
+  fields: LifestyleFields,
+  database = db,
+) {
+  await database.transaction("rw", database.lifestyles, async () => {
+    const existing = await database.lifestyles
+      .where("date")
+      .equals(date)
+      .first();
+    const record = lifestyleSchema.parse({
+      steps: null,
+      sleep: null,
+      training: "",
+      hunger: null,
+      energy: null,
+      ...existing,
+      ...fields,
+      ...stamped(existing),
+      date,
+    });
+    await database.lifestyles.put(record);
   });
 }
 export const findWeight = (date: string, database = db) =>
@@ -198,6 +229,7 @@ export function storageError(error: unknown): string {
       kg: "paino (10–500 kg)",
       age: "ikä (kokonaisluku 1–120)",
       training: "treenikerrat (kokonaisluku 0–30)",
+      trainingDay: "treenipäivä",
       sleep: "uni (0–24 h)",
       steps: "askeleet (kokonaisluku 0–200 000)",
       hunger: "nälkä (1–5)",

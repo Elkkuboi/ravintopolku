@@ -25,6 +25,9 @@ saa tarvita verkkoa. Asennus ei aja Playwrightia eikä pytestiä: aja ne itse en
   kuva lähtee aina roolilla `kuva_tulkki` tallennetuista asetuksista riippumatta, virheteksti HTTP-tilasta ilman
   palvelimen tekstiä, luonnoksen muokkaus ja tallennus, aterian muokkaus säilyttää piilotetut kentät.
 - Kehitys: asteikon laskenta, jakso, keskiarvo, tavoitepäivät, viikkopylväät ja sivun piirto.
+- Treenipäivä (`tests/treenipaiva.test.ts`): vanha kirjaus ilman kenttää kelpaa, napautus ja lomake eivät kumoa
+  toisiaan, synkronoitu kirjaus päivitetään, varmuuskopio ja synkronointi kuljettavat kentän, Kehityksen viivat,
+  lause ja sarake sekä tämän päivän keskeneräinen päivä keskiarvon ulkopuolella.
 - Asetukset: tavoitelomake, tavoite-ehdotuksen virheet, "Lähetä N poistoa" -nappi ja karsitut osat.
 - Tyylikuri (`tests/tyyli.test.ts`): värit vain neljässä väriyhdistelmässä, ei pyöristyksiä, liukuvärejä eikä varjoja,
   ei inline-tyylejä, ei kuvakekirjastoa, kirjasimet omasta alkuperästä ja esikatselun CSP sama kuin palvelimella.
@@ -41,6 +44,8 @@ Testi tarkistaa:
 
 - kolme sivua aukeavat neljällä värillä ilman CSP-rikkeitä ja konsolivirheitä, ja `theme-color` seuraa väriä
 - käsin kirjaus näkyy päivän summassa ja ateria aukeaa muokattavaksi
+- treenipäivä tallentuu napautuksesta selaimen kantaan samaan kirjaukseen lomakkeen kanssa, ei tyhjennä kesken olevaa
+  lomaketta ja näkyy Kehityksessä (viiva 30 päivän kuvaajassa, ei viikkopylväissä, sarake T, lause)
 - kamera ja galleria ovat erilliset kentät, `capture` on vain kamerassa ja kohdistuskehys näkyy vain näppäimistöllä
 - kuvapolku: kuva, lisätieto, tulkinta, luonnos ja tallennus (pyyntö alle 700 kt, rooli `kuva_tulkki`)
 - virhepolku: lyhyt suomenkielinen viesti ilman tarjoajan tekstiä ja "Kirjoita käsin"; "Yritä uudelleen" lähettää

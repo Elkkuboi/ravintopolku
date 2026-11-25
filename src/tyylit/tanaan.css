@@ -50,3 +50,6 @@ label.inline.suosikki { margin-top: 1rem; min-height: 44px; }
 .hallinta { margin-top: 2rem; border-top: 1px solid var(--rule); padding-top: .4rem; }
 .hallinta .inline-field input { width: auto; text-align: left; }
 .hallinta > * + * { margin-top: .8rem; }
+
+/* Treenipäivä: valinta painon alla omana rivinään (väli tulee sivun osioiden välistä), kosketuskohde 44 px. */
+label.inline.treeni { min-height: 44px; }

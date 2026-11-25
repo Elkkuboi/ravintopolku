@@ -1,4 +1,5 @@
-// Kehitys: paino, energia ja proteiini valitulta jaksolta, joka päättyy aina tänään. Päivittäiset luvut taitettuna.
+// Kehitys: paino, energia ja proteiini valitulta jaksolta, joka päättyy aina tänään. Treenipäivät näkyvät energian
+// kuvaajassa viivana akselin alla ja taulukossa. Päivittäiset luvut taitettuna.
 import { useMemo, useState } from "react";
 import { type NakymaProps } from "../kuori";
 import { localDay } from "../domain/dates";
@@ -17,6 +18,9 @@ import {
   paivaTeksti,
   tavoiteLahella,
   tavoitePaivat,
+  treeniLause,
+  treenipaivat,
+  treeniYhteenveto,
   viikkoPylvaat,
   viikkoPylvaina,
   type Jakso,
@@ -29,14 +33,16 @@ export default function Kehitys({ data }: NakymaProps) {
   const [jakso, setJakso] = useState<Jakso>(30);
   const end = localDay();
   const paivia = jaksonPituus(data, end, jakso);
-  const { paino, makrot } = useMemo(
+  const { paino, makrot, treeni } = useMemo(
     () => ({
       paino: painoKuvaaja(data, end, paivia),
       makrot: macroCharts(data, end, paivia),
+      treeni: treenipaivat(data),
     }),
     [data, end, paivia],
   );
   const [energia, proteiini] = makrot;
+  const treeniJaksolla = treeniYhteenveto(data, end, energia.points);
   const viikoittain = viikkoPylvaina(paivia);
   const pylvaat = viikoittain
     ? viikkoPylvaat(data, end, energia.points)
@@ -102,10 +108,23 @@ export default function Kehitys({ data }: NakymaProps) {
             alku={alku}
             loppu={loppu}
             huomautus={viikoittain ? "viikkokeskiarvot" : undefined}
-            kuvaus={macroSummary(energia)}
+            merkit={
+              viikoittain
+                ? undefined
+                : energia.points.map((p) => treeni.has(p.date))
+            }
+            kuvaus={macroSummary(energia, treeni)}
           />
         ) : (
           <p className="empty">Ei kirjauksia tällä jaksolla.</p>
+        )}
+        {treeniJaksolla.treeni > 0 && (
+          <p className="muted">
+            {energia.hasData && !viikoittain && (
+              <span className="treeni-merkki" aria-hidden="true" />
+            )}
+            {treeniLause(treeniJaksolla)}
+          </p>
         )}
       </section>
       <section>
@@ -129,6 +148,7 @@ export default function Kehitys({ data }: NakymaProps) {
         paivat={paino.paivat}
         makrot={makrot}
         paino={new Map(paino.pisteet.map((p) => [p.i, p.kg]))}
+        treeni={treeni}
       />
     </>
   );
@@ -158,25 +178,30 @@ function tavoiteLause({ taytti, paivia }: { taytti: number; paivia: number }) {
     : "Ei vielä valmiita päiviä.";
 }
 
-/** Päivät, joilla on kirjauksia tai punnitus, uusin ensin. Osittainen summa on alaraja (≥). */
+/** Päivät, joilla on kirjauksia, punnitus tai treeni, uusin ensin. Osittainen summa on alaraja (≥). */
 function Taulukko({
   end,
   paivat,
   makrot,
   paino,
+  treeni,
 }: {
   end: string;
   paivat: string[];
   makrot: MacroChart[];
   paino: Map<number, number>;
+  treeni: ReadonlySet<string>;
 }) {
   const rivit = paivat
     .map((d, i) => ({
       d,
       arvot: makrot.map((c) => c.points[i]),
       kg: paino.get(i) ?? null,
+      treeni: treeni.has(d),
     }))
-    .filter((r) => r.kg !== null || r.arvot.some((p) => p.value !== null))
+    .filter(
+      (r) => r.kg !== null || r.treeni || r.arvot.some((p) => p.value !== null),
+    )
     .reverse();
   if (!rivit.length) return null;
   return (
@@ -198,6 +223,9 @@ function Taulukko({
                 <abbr title="rasva, g">R</abbr>
               </th>
               <th>kg</th>
+              <th>
+                <abbr title="treenipäivä">T</abbr>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -208,6 +236,7 @@ function Taulukko({
                   <td key={makrot[i].key}>{luku(p)}</td>
                 ))}
                 <td>{formatNumber(r.kg)}</td>
+                <td>{r.treeni ? "✓" : ""}</td>
               </tr>
             ))}
           </tbody>

@@ -169,7 +169,10 @@ export function Viivakuvaaja({
   );
 }
 
-/** Pylväs päivää (tai viikkoa) kohden nollasta alkaen. Puuttuva arvo on rako; osittainen summa on ontto pylväs. */
+/**
+ * Pylväs päivää (tai viikkoa) kohden nollasta alkaen. Puuttuva arvo on rako; osittainen summa on ontto pylväs. Merkitty
+ * päivä (treenipäivä) on lyhyt viiva akselin alla, myös päivänä ilman kirjauksia.
+ */
 export function Pylvaskuvaaja({
   nimet,
   arvot,
@@ -180,6 +183,8 @@ export function Pylvaskuvaaja({
   loppu,
   kuvaus,
   huomautus,
+  merkit,
+  merkinNimi = "treenipäivä",
   korkeus = 150,
 }: Pohja & {
   /** Pylvään nimi vihjetekstiin, esim. "18.11." tai "3.11.–9.11. keskiarvo". */
@@ -187,6 +192,9 @@ export function Pylvaskuvaaja({
   arvot: { value: number | null; partial: boolean }[];
   /** Lyhyt teksti kuvaajan vasempaan yläkulmaan, esim. "viikkokeskiarvot". */
   huomautus?: string;
+  /** Pylväskohtainen merkintä (treenipäivä); puuttuu viikkopylväiltä. */
+  merkit?: boolean[];
+  merkinNimi?: string;
   tavoite: number | null;
   yksikko: string;
   desimaalit?: number;
@@ -246,12 +254,25 @@ export function Pylvaskuvaaja({
               height={r(al.yAla - y)}
             >
               <title>
-                {`${nimet[i]} ${p.partial ? "vähintään " : ""}${formatNumber(p.value, desimaalit)} ${yksikko}`}
+                {`${nimet[i]} ${p.partial ? "vähintään " : ""}${formatNumber(p.value, desimaalit)} ${yksikko}${merkit?.[i] ? ", " + merkinNimi : ""}`}
               </title>
             </rect>
           );
         })}
       </g>
+      {merkit?.some(Boolean) && (
+        <g className="merkki">
+          {merkit.map((m, i) => {
+            if (!m) return null;
+            const { x, w } = palkki(i, n, al);
+            return (
+              <rect key={i} x={r(x)} y={al.yAla + 3} width={r(w)} height={3}>
+                <title>{`${nimet[i]} ${merkinNimi}`}</title>
+              </rect>
+            );
+          })}
+        </g>
+      )}
     </svg>
   );
 }

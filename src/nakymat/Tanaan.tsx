@@ -1,12 +1,12 @@
 // Tänään-sivu: päivän vaihto, energia ja makrot, kuvanapit ja käsin kirjaus, Ilmarin odottavat luonnokset (vain jos
-// niitä on), ateriat, paino sekä taitettu "Uni, liike ja olo". Kuvan valinnan jälkeen sivu näyttää kuvapolun
+// niitä on), ateriat, paino, treenipäivä sekä taitettu "Uni, liike ja olo". Kuvan valinnan jälkeen sivu näyttää kuvapolun
 // (components/KuvaLuonnos.tsx), ja käsin kirjaus ja muokkaus avautuvat koko sivun ikkunaan (MealEditor).
 import { useRef, useState } from "react";
 import { type Meal, type Photo, stamped } from "../domain/model";
 import { type AIDraft } from "../ai/provider";
 import { poistaLuonnos } from "../ai/luonnokset";
 import { compressPhoto } from "../data/photos";
-import { saveRecord } from "../data/db";
+import { saveLifestyle, saveRecord } from "../data/db";
 import { localDay, addDays } from "../domain/dates";
 import { dayTotals, goalForDay } from "../domain/nutrition";
 import { MealEditor } from "../components/MealEditor";
@@ -24,6 +24,7 @@ import {
   aterianKcal,
   aterianAlarivi,
   edellinenPaino,
+  lomakkeenAvain,
 } from "./paiva";
 import "../tyylit/tanaan.css";
 
@@ -203,10 +204,22 @@ export default function Tanaan({ data, notify, run }: NakymaProps) {
         />
       </section>
 
+      <label className="inline treeni">
+        <input
+          type="checkbox"
+          checked={lifestyle?.trainingDay ?? false}
+          onChange={(e) => {
+            const trainingDay = e.target.checked;
+            void run(() => saveLifestyle(date, { trainingDay }));
+          }}
+        />
+        Treenipäivä
+      </label>
+
       <details className="fold">
         <summary>Uni, liike ja olo</summary>
         <LifestyleForm
-          key={date + (lifestyle?.updatedAt ?? "")}
+          key={lomakkeenAvain(date, lifestyle)}
           date={date}
           lifestyle={lifestyle}
           onSaved={() => notify("Tallennettu.")}

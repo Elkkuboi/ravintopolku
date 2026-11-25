@@ -6,12 +6,15 @@ on PWA. Päiväkirja on puhelimen selaimessa (IndexedDB), toimii ilman verkkoa j
 
 ## Mitä siinä on
 
-- **Tänään**: päivän energia ja makrot, **Ota kuva** (kamera), **Galleriasta** ja **Kirjoita** (käsin), ateriat, paino
-  ja taitettu "Uni, liike ja olo". Ilmarin odottavat luonnokset näkyvät vain, kun niitä on.
+- **Tänään**: päivän energia ja makrot, **Ota kuva** (kamera), **Galleriasta** ja **Kirjoita** (käsin), ateriat, paino,
+  **Treenipäivä** (yksi napautus) ja taitettu "Uni, liike ja olo". Ilmarin odottavat luonnokset näkyvät vain, kun
+  niitä on.
 - **Kuvasta ateria**: kuva pienennetään puhelimessa enintään 700 kt:n JPEGiksi ja tulkitaan työaseman palvelimen ja
   aiops-välittäjän kautta (rooli `kuva_tulkki`, Hub päättää mallin). Tulos on tallentamaton luonnos, jonka käyttäjä
   tarkistaa ja tallentaa tai hylkää.
 - **Kehitys**: paino, energia ja proteiini 7, 30 tai 90 päivältä tai koko ajalta; päivittäiset luvut taitettuna.
+  Treenipäivät näkyvät viivana energian kuvaajan alla ja sarakkeena T, ja kuvaajan alla on energian keskiarvo
+  treenipäivinä ja muina päivinä.
 - **Asetukset**: tavoitteet (myös ehdotus omin sanoin), omat ruuat, synkronoinnin tila, varmuuskopio ja CSV sekä
   Promptit: kielimallin ohjeet sellaisinaan, vain luettavina.
 
