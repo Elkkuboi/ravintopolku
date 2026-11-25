@@ -32,8 +32,8 @@ pysyvät laitteella eivätkä synkronoidu. Yli 25 poistoa kerralla vaatii vahvis
 
 ## Kehitys ja tarkistukset
 
-Node 24 (asennus kääntää versiolla 24.19.0), npm ja uv. Palvelin on Python 3.14 (`palvelin/.python-version`; uv hakee
-sen kehityskoneelle itse).
+Node 24 (asennus kääntää versiolla 24.19.0), npm ja uv. Palvelin ajetaan tuotannossa Louhin omalla Python 3.14:llä.
+Koodin pitää toimia myös Python 3.12:lla (`palvelin/.python-version`), koska Ilmarin kontissa ei ole muuta.
 
 ```bash
 npm ci --ignore-scripts
