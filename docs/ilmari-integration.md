@@ -124,14 +124,24 @@ Asetusten vanhat kentät `kuvantunnistus` ja `kuvantulkinta` säilyvät datassa 
 Asetukset → Tavoitteet → taite **Ehdota tavoitteet omin sanoin**: vapaa tekstikenttä (esim. "painon lievä pudotus" tai
 "rasvan muuttaminen lihakseksi") ja **Ehdota**. Sovellus lähettää tekstin sekä
 lyhyen kuvan nykytilanteesta (ikä, pituus, uusin paino, treenit, nykyinen energiatavoite) Louhin palvelimelle, joka
-kutsuu aiops-välittäjää samalla tavalla kuin kuvasta ateria. Ilmari ehdottaa päivän energia- ja makrotavoitteet sekä
-lyhyen perustelun, ja ehdotus näkyy **tarkistettavana**: luvut voi muokata, ja vasta **Ota käyttöön** kirjoittaa tavoitteen. Hylättyä tai epäonnistunutta ehdotusta ei tallenneta, eikä olemassa olevaa tavoitetta muuteta.
+kutsuu aiops-välittäjää samalla tavalla kuin kuvasta ateria. Ilmari ehdottaa päivän energia- ja makrotavoitteet,
+niiden tavoitealueet ja lyhyen perustelun, ja ehdotus näkyy **tarkistettavana**: luvut voi muokata, ja vasta **Ota käyttöön** kirjoittaa tavoitteen. Hylättyä tai epäonnistunutta ehdotusta ei tallenneta, eikä olemassa olevaa tavoitetta muuteta.
+
+**Tavoitealueet.** Jokaiselle luvulle malli valitsee, kuinka monta prosenttia päivä saa jäädä alle tavoitteen (`alle`)
+ja mennä sen yli (`yli`, `null` = ei ylärajaa), jotta päivä on vielä mittarin vihreällä alueella. Kehote ohjaa
+valitsemaan alueet tavoitteen mukaan: pudotuksessa ylitys on tiukalla, kasvatuksessa alitus. Palvelin pyöristää
+prosentit kokonaisluvuiksi ja leikkaa ne rajoihin (`alle` 0–50, `yli` 0–100, energian `alle` enintään 20); puuttuva
+tai kelvoton kohta korvataan oletuksella ja kerrotaan oletuksissa. Ehdotuksessa alueet näkyvät yksikköinä ja
+prosentteina, ja käyttöönoton jälkeen niitä säädetään kohdassa **Tavoitealue**.
 
 **Rajapinta sovellukselle.** `POST /api/tavoitteet` (`palvelin/`, `tavoitteet.py`) JSON-rungolla `{"teksti": enintään
-500 merkkiä, "rooli"?: rooli, "profiili"?: enintään 300 merkkiä}`; sama Tailscale-tunnistus, Origin-sääntö ja 1 MiB:n
-runkoraja kuin muilla `/api`-reiteillä. Vastaus `{"ehdotus": {"energy","protein","carbs","fat"} luku|null,
-"perustelu": enintään 400 merkkiä, "oletukset": [enintään 10 × 300 merkkiä], "rooli", "malli"}`. Ilman
-`valittaja`-sokettia reitti vastaa 404 ja sovellus kertoo, ettei toiminto ole käytössä.
+500 merkkiä, "rooli"?: rooli, "profiili"?: enintään 300 merkkiä, "alueet"?: true}`; sama Tailscale-tunnistus,
+Origin-sääntö ja 1 MiB:n runkoraja kuin muilla `/api`-reiteillä. Vastaus `{"ehdotus": {"energy","protein","carbs","fat"}
+luku|null, "alueet": {"energy","protein","carbs","fat"} → {"alle": 0–50, "yli": 0–100|null}, "perustelu": enintään 400
+merkkiä, "oletukset": [enintään 10 × 300 merkkiä], "rooli", "malli"}`. `alueet` on vastauksessa vain, kun pyynnössä
+on `"alueet": true`: selaimen välimuistissa oleva vanha sovellusversio tarkistaa vastauksen tiukalla skeemalla ja
+hylkäisi tuntemattoman kentän. Ilman `valittaja`-sokettia reitti vastaa 404 ja sovellus kertoo, ettei toiminto ole
+käytössä.
 
 **Välittäjäkutsu.** `POST /v1/chat/completions` OpenAI-muotoisena JSONina: `model` on **rooli**, ei malli. Sovelluksen
 roolinimet `tavoite_ehdottaja`, `tavoite_ehdottaja_pilvi` ja `tavoite_ehdottaja_paikallinen` muunnetaan palvelimessa
@@ -149,8 +159,10 @@ makroista (4 + 4 + 9 kcal/g), ja jos makrot poikkeavat energiatavoitteesta yli 1
 neljästä luvusta ei kelpaa, vastaus on 422. Tuntematon arvo on null, ei 0.
 
 **Hyväksyminen.** Hyväksytyt luvut tallentuvat tavoitteeksi, jonka `effectiveDate` on tämä päivä: saman päivän
-tavoite korvataan ja aiempi jää historiaksi. Kuitu sekä painotavoite ja -päivämäärä peritään voimassa olevalta
-tavoitteelta, joten Goal-skeemaa ei muuteta; rooli, malli ja perustelu näkyvät vain tarkistusnäkymässä.
+tavoite korvataan ja aiempi jää historiaksi. Kuitu ja sen tavoitealue sekä painotavoite ja -päivämäärä peritään
+voimassa olevalta tavoitteelta. Ehdotetut tavoitealueet tallentuvat tavoitteen valinnaiseen kenttään `alueet`
+(`src/domain/model.ts`); vanha tavoite ilman kenttää käyttää oletusalueita. Rooli, malli ja perustelu näkyvät vain
+tarkistusnäkymässä.
 
 **Testit.** `palvelin/tests/test_tavoitteet.py` (reitti, roolit, numeroiden rajat, virheet ja lokitus väärennetyllä
 välittäjällä Unix-soketissa) ja `tests/tavoitteet.test.ts` (pyyntö, palvelinvirheiden näyttäminen, rajatarkistus ja

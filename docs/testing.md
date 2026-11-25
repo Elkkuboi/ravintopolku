@@ -28,6 +28,9 @@ saa tarvita verkkoa. Asennus ei aja Playwrightia eikä pytestiä: aja ne itse en
 - Tavoitealue (`tests/tavoitealue.test.ts`): säännön rajat molempiin suuntiin (raja kuuluu alueeseen, yksikkö sen
   ulkopuolella ei), pyöristys näytetyn luvun mukaan, osittainen summa alarajana, mittarin asteikko, tekstit ja
   piirto viidessä tilassa (tyhjä, alle, alueella, yli, osittainen) sekä nollatavoite ilman aluetta.
+- Säädettävä tavoitealue (`tests/tavoitealue-asetus.test.ts`): sääntö tavoitteen omilla prosenteilla (katto, lattia,
+  proteiinin yläraja), mittarit ja Kehitys tavoitteen alueilla, lomakkeen prosenttikentät ja virheet, skeema sekä
+  alueiden kulku ehdotuksesta, lomakkeesta, kannasta, synkronoinnista ja varmuuskopiosta.
 - Treenipäivä (`tests/treenipaiva.test.ts`): vanha kirjaus ilman kenttää kelpaa, napautus ja lomake eivät kumoa
   toisiaan, synkronoitu kirjaus päivitetään, varmuuskopio ja synkronointi kuljettavat kentän, Kehityksen viivat,
   lause ja sarake sekä tämän päivän keskeneräinen päivä keskiarvon ulkopuolella.
@@ -49,6 +52,9 @@ Testi tarkistaa:
 - käsin kirjaus näkyy päivän summassa ja ateria aukeaa muokattavaksi
 - tavoitealue: tavoitteen tallennus Asetuksissa, palkin pääty ja tavoitteen merkki oikeissa kohdissa (leveydet
   tulevat tuotannon CSP:n alla), alueelle osunut luku vaihtaa väriä ja ylitys varoittaa
+- tavoitealueen säätö: prosentit Asetuksissa, alue yksikköinä päivittyy kirjoittaessa, kelvoton prosentti ei
+  tallennu, Tänään-sivu käyttää tallennettua aluetta ja se säilyy uudelleenlatauksen yli
+- tavoite-ehdotus: pyyntö pyytää tavoitealueet, ne näkyvät ehdotuksessa ja tallentuvat käyttöönotossa
 - treenipäivä tallentuu napautuksesta selaimen kantaan samaan kirjaukseen lomakkeen kanssa, ei tyhjennä kesken olevaa
   lomaketta ja näkyy Kehityksessä (viiva 30 päivän kuvaajassa, ei viikkopylväissä, sarake T, lause)
 - kamera ja galleria ovat erilliset kentät, `capture` on vain kamerassa ja kohdistuskehys näkyy vain näppäimistöllä
@@ -64,11 +70,13 @@ Testi tarkistaa:
 `palvelin/tests/test_asennus.py` ajaa asennusskriptin väliaikaisessa juuressa valekomennoilla (Docker, systemd, uv):
 onnistunut asennus, paluu edelliseen versioon kun palvelimen asennus tai käynnistys pettää, `--vain-sovellus`,
 isännän lisäryhmän säilyminen, keskeytys (Ctrl-C tai katkennut yhteys) myös uuden version jo käynnistyttyä ja
-kahdesti peräkkäin, kesken jääneen ajon varakopio ja se, ettei puuttuva Python ehdi muuttaa mitään. Tuotanto ajaa
+kahdesti peräkkäin, kesken jääneen ajon varakopio, se, ettei puuttuva Python ehdi muuttaa mitään, ja se, että
+`--vain-sovellus` pysähtyy, kun palvelimen koodi on muuttunut asennetun commitin jälkeen. Tuotanto ajaa
 Python 3.14:ää: aja palvelimen testit ennen yhdistämistä myös sillä (`uv run --python 3.14 --frozen pytest -q`).
 
 Muut `palvelin/tests/`: tunnistus ja turvaotsakkeet, synkronointi, luonnoslaatikko, kuvan tulkinta (700 kt:n raja,
-virheteksti ilman välittäjän tekstiä), tavoite-ehdotus, väri (`/api/ulkoasu`), kielimallin ohjeet (`/api/kehotteet`:
+virheteksti ilman välittäjän tekstiä), tavoite-ehdotus (myös tavoitealueiden rajat, oletukset ja vastauksen vanha
+muoto ilman pyyntöä), väri (`/api/ulkoasu`), kielimallin ohjeet (`/api/kehotteet`:
 samat tekstit kuin oikeassa kutsussa, vain luku) ja woff2:n MIME-tyyppi.
 
 ## Puhelimella tarkistettavat

@@ -33,8 +33,15 @@ const vastaus = (runko: unknown, status = 200) =>
   }) as Response;
 const f = (hae: unknown) => hae as unknown as typeof fetch;
 const TAVOITE = "painon lievä pudotus";
+const ALUEET = {
+  energy: { alle: 10, yli: 5 },
+  protein: { alle: 5, yli: null },
+  carbs: { alle: 20, yli: 10 },
+  fat: { alle: 20, yli: 10 },
+};
 const vastausRunko = {
   ehdotus: { energy: 2350, protein: 165, carbs: 245, fat: 78 },
+  alueet: ALUEET,
   perustelu: "Kevyt alipaino ja runsas proteiini sopivat tavoitteeseen.",
   oletukset: ["Kolme ateriaa ja yksi välipala"],
   rooli: "tavoite_ehdottaja",
@@ -81,10 +88,12 @@ describe("ehdotaTavoitteet", () => {
     expect((init.headers as Record<string, string>)["X-Ravintopolku"]).toBe(
       "1",
     );
+    // alueet: true pyytää tavoitealueet; ilman sitä palvelin vastaa vanhassa muodossa
     expect(JSON.parse(String(init.body))).toEqual({
       teksti: TAVOITE,
       rooli: OLETUSROOLI,
       profiili: "ikä 34, paino 82 kg",
+      alueet: true,
     });
   });
 
@@ -155,6 +164,24 @@ describe("ehdotaTavoitteet", () => {
         oletukset: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"],
       },
       { ...vastausRunko, virhe: "eikös näytetä" },
+      // tavoitealueet: puuttuva (vanha palvelin), vajaa, rajojen ulkopuolinen, desimaali ja ylimääräinen kenttä
+      (({ alueet: _pois, ...muu }) => muu)(vastausRunko),
+      { ...vastausRunko, alueet: { ...ALUEET, fat: undefined } },
+      { ...vastausRunko, alueet: { ...ALUEET, energy: { alle: 51, yli: 5 } } },
+      {
+        ...vastausRunko,
+        alueet: { ...ALUEET, energy: { alle: 10, yli: 101 } },
+      },
+      { ...vastausRunko, alueet: { ...ALUEET, energy: { alle: -1, yli: 5 } } },
+      { ...vastausRunko, alueet: { ...ALUEET, energy: { alle: 7.5, yli: 5 } } },
+      {
+        ...vastausRunko,
+        alueet: { ...ALUEET, energy: { alle: null, yli: 5 } },
+      },
+      {
+        ...vastausRunko,
+        alueet: { ...ALUEET, fiber: { alle: 10, yli: null } },
+      },
     ])
       await expect(
         ehdotaTavoitteet(TAVOITE, { hae: async () => vastaus(runko) }),

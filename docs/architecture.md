@@ -8,7 +8,7 @@ UI validoi syötteen, muodostaa aterian ruokalistasta ja välittää sen `saveMe
 
 ## Tietomalli ja versiot
 
-Dexie version 1: profiles, goals, foods, meals, photos, templates, weights, lifestyles, days, settings. Jokaisella tietueella vakaa UUID ja createdAt/updatedAt. Painon, elintapojen ja päivän tilan date-indeksit ovat uniikkeja. Profiileja ja asetuksia on korkeintaan yksi. Tavoitehistoria valitaan effectiveDate-päivän mukaan; sama voimaantulopäivä korvataan `saveGoal`-transaktiossa.
+Dexie version 1: profiles, goals, foods, meals, photos, templates, weights, lifestyles, days, settings. Jokaisella tietueella vakaa UUID ja createdAt/updatedAt. Painon, elintapojen ja päivän tilan date-indeksit ovat uniikkeja. Profiileja ja asetuksia on korkeintaan yksi. Tavoitehistoria valitaan effectiveDate-päivän mukaan; sama voimaantulopäivä korvataan `saveGoal`-transaktiossa. Tavoitteen valinnainen kenttä `alueet` kertoo tavoitealueen prosentteina (alle ja yli tavoitteen) jokaiselle luvulle; ilman sitä käytetään oletuksia (`domain/nutrition.ts`).
 
 Ateriarivi säilyttää nimen, valmistustilan, lähteen, syöttötavan, määrän ja ravintoarvot. foodId on viite kirjastoon, **ei laskennan lähde**. Aterialla on lisäksi laskettu snapshot, alkuperä, oletukset, kuva-ID ja muistiinpano. Kokonaisarvon snapshot on null, jos yhdelläkin ainesosalla on kyseinen arvo tuntematon. Alkuperäiset rivit säilyvät, joten tunnettu osasumma ja puuttuvien rivien määrä ovat laskettavissa erikseen. Vakioateria sisältää rivien snapshotit ja määrät; se ei ole suosikkiruoka. Kirjastosta poistaminen ei poista historiatietoa.
 

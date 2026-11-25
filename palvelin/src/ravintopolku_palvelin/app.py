@@ -256,9 +256,10 @@ def luo(a: Asetukset) -> Starlette:
                 raise kuva.Virhe(400, "runko ei ole JSONia") from None
             if not isinstance(data, dict):
                 raise kuva.Virhe(400, "runko: JSON-olio")
-            teksti, rooli, profiili = tavoitteet.tarkista_pyynto(data)
+            teksti, rooli, profiili, alueet = tavoitteet.tarkista_pyynto(data)
             async with kuvalukko:  # sama lukko: yksi ihminen ei hapoista useampaa mallia kerrallaan
-                tulos = await run_in_threadpool(tavoitteet.ehdota, str(a.valittaja), teksti, rooli, profiili)
+                tulos = await run_in_threadpool(tavoitteet.ehdota, str(a.valittaja), teksti, rooli, profiili,
+                                                alueet=alueet)
         except kuva.Virhe as e:
             return JSONResponse({"virhe": str(e)}, status_code=e.tila)
         return JSONResponse(tulos)

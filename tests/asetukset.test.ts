@@ -59,6 +59,11 @@ describe("poistojen vahvistus säilyy", () => {
 describe("Tavoitteet-osio", () => {
   const piirra = (data: Dataset) =>
     renderToStaticMarkup(createElement(Tavoitteet, { data, notify }));
+  /** Tavoitealueen prosenttikentät järjestyksessä: [aria-label, arvo]. */
+  const prosenttikentat = (html: string) =>
+    [
+      ...html.matchAll(/aria-label="([^"]+prosenttia)"[^>]*? value="([^"]*)"/g),
+    ].map((m) => [m[1], m[2]]);
   it("kuusi kenttää voimassa olevilla luvuilla, Tallenna ja kaksi taitetta", () => {
     const data = emptyDataset();
     data.goals.push({
@@ -87,10 +92,75 @@ describe("Tavoitteet-osio", () => {
     );
     expect(html).toContain('<details class="fold"><summary>Profiili</summary>');
   });
-  it("ilman tavoitetta kentät ovat tyhjät", () => {
+  it("ilman tavoitetta tavoitekentät ovat tyhjät ja tavoitealueessa on oletukset", () => {
     const html = piirra(emptyDataset());
-    expect(html).not.toMatch(/value="\d/);
-    expect(html).toContain("Tavoitepaino kg");
+    const [lomake, alue] = html.split("<summary>Tavoitealue</summary>");
+    expect(lomake).not.toMatch(/value="\d/);
+    expect(lomake).toContain("Tavoitepaino kg");
+    expect(prosenttikentat(alue)).toEqual([
+      ["Energia: alle tavoitteen, prosenttia", "10"],
+      ["Energia: yli tavoitteen, prosenttia", "10"],
+      ["Proteiini: alle tavoitteen, prosenttia", "10"],
+      ["Proteiini: yli tavoitteen, prosenttia", ""],
+      ["Hiilihydraatit: alle tavoitteen, prosenttia", "20"],
+      ["Hiilihydraatit: yli tavoitteen, prosenttia", "20"],
+      ["Rasva: alle tavoitteen, prosenttia", "20"],
+      ["Rasva: yli tavoitteen, prosenttia", "20"],
+      ["Kuitu: alle tavoitteen, prosenttia", "10"],
+      ["Kuitu: yli tavoitteen, prosenttia", ""],
+    ]);
+  });
+  it("tavoitealue taitteena lomakkeen sisällä: tavoitteen omat prosentit ja alue yksikköinä", () => {
+    const data = emptyDataset();
+    data.goals.push({
+      ...stamped(),
+      effectiveDate: localDay(),
+      kind: "track",
+      targetWeight: null,
+      targetDate: null,
+      nutrients: {
+        energy: 2000,
+        protein: 150,
+        carbs: 200,
+        fat: 60,
+        fiber: null,
+      },
+      alueet: {
+        energy: { alle: 10, yli: 5 },
+        protein: { alle: 5, yli: null },
+        carbs: { alle: 20, yli: 10 },
+        fat: { alle: 25, yli: 0 },
+        fiber: { alle: 10, yli: null },
+      },
+    });
+    const html = piirra(data);
+    // taite on saman lomakkeen sisällä kuin Tallenna, joten yksi tallennus vie luvut ja alueet
+    expect(html).toMatch(
+      /<form class="lomake">.*<details class="fold"><summary>Tavoitealue<\/summary>.*Tallenna<\/button><\/div><\/form>/s,
+    );
+    const alue = html.split("<summary>Tavoitealue</summary>")[1];
+    expect(prosenttikentat(alue).map(([, arvo]) => arvo)).toEqual([
+      "10",
+      "5",
+      "5",
+      "",
+      "20",
+      "10",
+      "25",
+      "0",
+      "10",
+      "",
+    ]);
+    const teksti = alue.replace(/\u00a0/g, " ");
+    expect(teksti).toContain(
+      'Energia<small class="muted">1 800–2 100 kcal</small>',
+    );
+    expect(teksti).toContain(
+      'Proteiini<small class="muted">vähintään 143 g</small>',
+    );
+    expect(teksti).toContain('Rasva<small class="muted">45–60 g</small>');
+    // kuidulla ei ole tavoitetta: rivi on, alue yksikköinä puuttuu
+    expect(teksti).toContain('Kuitu<small class="muted"> </small>');
   });
 });
 

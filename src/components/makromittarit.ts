@@ -1,5 +1,6 @@
-import { type NutrientKey } from "../domain/model";
+import { type Alueet, type NutrientKey } from "../domain/model";
 import {
+  OLETUSALUEET,
   formatNumber,
   osuma,
   tavoitealue,
@@ -88,8 +89,12 @@ export interface Asteikko {
   /** Ylitys on varoitus. Vain energialla: muiden ylitys näkyy jo energiassa. */
   varoitus: boolean;
 }
-export function asteikko(key: NutrientKey, r: MeterReading): Asteikko | null {
-  const alue = tavoitealue(key, r.goal);
+export function asteikko(
+  key: NutrientKey,
+  r: MeterReading,
+  alueet: Alueet = OLETUSALUEET,
+): Asteikko | null {
+  const alue = tavoitealue(key, r.goal, alueet);
   if (!alue || r.goal === null || !naytaMittari(r)) return null;
   const taysi = alue.yla ?? r.goal;
   const p = (x: number) => Math.min(100, Math.max(0, (x / taysi) * 100));
@@ -105,14 +110,37 @@ export function asteikko(key: NutrientKey, r: MeterReading): Asteikko | null {
   };
 }
 
-/** Otsikon sivuteksti: yksi tavoite ja sen alue, "tavoite 2 300 (2 070–2 530) kcal". Riippuu vain tavoitteesta. */
-export function energiaTavoite(r: MeterReading): string {
+/** Osuman vihreän osan pienin leveys prosentteina palkista: näkyy, vaikka päivä on täsmälleen alueen alarajalla. */
+export const OSUMA_MIN = 4;
+/**
+ * Alueelle osuneen päivän vihreä osa palkissa: alueen alusta täytön päähän, vähintään OSUMA_MIN leveänä. Kun alue on
+ * kapea tai nollan levyinen (alle 0 %), osa ulottuu täytön päästä taaksepäin, joten osuma näkyy palkissa aina.
+ */
+export function osumaPalkki(
+  a: Asteikko | null,
+): { alku: number; leveys: number } | null {
+  if (a?.osuma !== "sisalla") return null;
+  const alku = Math.max(0, Math.min(a.alku, a.taytto - OSUMA_MIN));
+  return { alku, leveys: a.taytto - alku };
+}
+
+/**
+ * Otsikon sivuteksti: yksi tavoite ja sen alue, "tavoite 2 300 (2 070–2 530) kcal", ilman ylärajaa
+ * "tavoite 2 300 (väh. 2 070) kcal". Riippuu vain tavoitteesta.
+ */
+export function energiaTavoite(
+  r: MeterReading,
+  alueet: Alueet = OLETUSALUEET,
+): string {
   if (r.goal === null) return "ei tavoitetta";
-  const alue = tavoitealue("energy", r.goal);
+  const alue = tavoitealue("energy", r.goal, alueet);
+  // Yhden luvun alue (0 % molempiin suuntiin) on sama kuin tavoite: sitä ei toisteta.
   const vali =
-    alue && alue.yla !== null
-      ? ` (${formatNumber(alue.ala, 0)}–${formatNumber(alue.yla, 0)})`
-      : "";
+    !alue || alue.ala === alue.yla
+      ? ""
+      : alue.yla === null
+        ? ` (väh. ${formatNumber(alue.ala, 0)})`
+        : ` (${formatNumber(alue.ala, 0)}–${formatNumber(alue.yla, 0)})`;
   return `tavoite ${formatNumber(r.goal, 0)}${vali} kcal`;
 }
 
@@ -179,4 +207,23 @@ export function mittariTeksti(
         ? ", yli tavoitealueen"
         : "";
   return `${makroOsat(r, unit)[0]} ${unit}${tavoite}${osui}`;
+}
+
+/**
+ * Tavoitealue sanoina lomakkeeseen: "2 070–2 530 kcal", ilman ylärajaa "vähintään 126 g", yhden luvun alue
+ * "tasan 200 g". Tyhjä, kun tavoitetta ei ole tai alue ei ole laskettavissa.
+ */
+export function alueTeksti(
+  key: NutrientKey,
+  goal: number | null | undefined,
+  alueet: Alueet = OLETUSALUEET,
+): string {
+  const alue = tavoitealue(key, goal, alueet);
+  if (!alue) return "";
+  const yksikko = meterUnit(key);
+  if (alue.yla === null)
+    return `vähintään ${formatNumber(alue.ala, 0)} ${yksikko}`;
+  return alue.ala === alue.yla
+    ? `tasan ${formatNumber(alue.ala, 0)} ${yksikko}`
+    : `${formatNumber(alue.ala, 0)}–${formatNumber(alue.yla, 0)} ${yksikko}`;
 }

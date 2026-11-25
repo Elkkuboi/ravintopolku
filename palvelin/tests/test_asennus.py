@@ -297,6 +297,66 @@ def test_vain_sovellus_ei_koske_palvelimeen(tmp_path: Path):
     assert sorted(p.name for p in kone.kohde.iterdir()) == ["DEPLOYED", "dist", "palvelin"]
 
 
+def _asennettu_commit(kone: Kone) -> str:
+    """Merkitsee edellisen asennuksen tehdyksi repon nykyisestä commitista, kuten oikea DEPLOYED."""
+    commit = subprocess.run(["git", "-C", str(kone.repo), "rev-parse", "--short", "HEAD"], check=True,
+                            capture_output=True, text=True).stdout.strip()
+    (kone.kohde / "DEPLOYED").write_text(f"{commit} 2026-11-24T00:22:00+02:00\n")
+    return commit
+
+
+def _commitoi(kone: Kone, polku: str, sisalto: str) -> None:
+    tiedosto = kone.repo / polku
+    tiedosto.parent.mkdir(parents=True, exist_ok=True)
+    tiedosto.write_text(sisalto)
+    kone.git("add", "-A")
+    kone.git("-c", "user.name=testi", "-c", "user.email=testi@example.invalid", "commit", "-q", "-m", "muutos")
+
+
+@pytest.mark.parametrize("polku", ["palvelin/src/koodi.py", "palvelin/src/uusi/moduuli.py", "palvelin/uv.lock"])
+def test_vain_sovellus_pysahtyy_kun_palvelin_on_muuttunut(tmp_path: Path, polku: str):
+    """Sovellus ja palvelin eivät saa jäädä eri versioihin: muuttunut palvelin vaatii täyden asennuksen."""
+    kone = Kone(tmp_path)
+    asennettu = _asennettu_commit(kone)
+    _commitoi(kone, polku, "muuttunut\n")
+    tulos = kone.aja("--vain-sovellus")
+    assert tulos.returncode == 1
+    assert f"Palvelimen koodi on muuttunut asennetun version ({asennettu}) jälkeen" in tulos.stderr
+    assert "Mitään ei muutettu" in tulos.stderr and "Aja täysi asennus" in tulos.stderr
+    # mitään ei käännetty eikä vaihdettu
+    assert kone.kutsut("docker") == [] and kone.kutsut("systemctl") == []
+    assert (kone.kohde / "dist" / "index.html").read_text() == "vanha\n"
+    assert (kone.kohde / "DEPLOYED").read_text().startswith(asennettu + " ")
+    assert sorted(p.name for p in kone.kohde.iterdir()) == ["DEPLOYED", "dist", "palvelin"]
+    # täysi asennus samasta commitista kelpaa
+    assert kone.taysi().returncode == 0
+    assert (kone.kohde / "palvelin" / "uusi").exists()
+
+
+@pytest.mark.parametrize("polku", ["src/sovellus.ts", "palvelin/tests/test_x.py", "palvelin/pyproject.toml",
+                                   "docs/ohje.md"])
+def test_vain_sovellus_kelpaa_kun_palvelin_on_ennallaan(tmp_path: Path, polku: str):
+    kone = Kone(tmp_path, python=False)
+    _asennettu_commit(kone)
+    _commitoi(kone, polku, "# muuttunut\n")
+    tulos = kone.aja("--vain-sovellus")
+    assert tulos.returncode == 0, tulos.stderr
+    assert (kone.kohde / "dist" / "index.html").read_text() == "uusi\n"
+    assert (kone.kohde / "palvelin" / "vanha").exists() and kone.kutsut("uv") == []
+
+
+@pytest.mark.parametrize("merkinta", ["abcdef1 2026-11-24T00:22:00+02:00\n", "vanha 2026-11-24\n", "\n",
+                                      "HEAD 2026-11-24\n", "--help x\n"])
+def test_vain_sovellus_tuntemattomasta_asennuksesta_ei_voida_verrata(tmp_path: Path, merkinta: str):
+    """DEPLOYED nimeää commitin, jota tässä repossa ei ole (tai ei commitia lainkaan): asennus etenee kuten ennen."""
+    kone = Kone(tmp_path, python=False)
+    _commitoi(kone, "palvelin/src/koodi.py", "muuttunut\n")
+    (kone.kohde / "DEPLOYED").write_text(merkinta)
+    tulos = kone.aja("--vain-sovellus")
+    assert tulos.returncode == 0, tulos.stderr
+    assert (kone.kohde / "dist" / "index.html").read_text() == "uusi\n"
+
+
 @pytest.mark.parametrize("args, viesti", [
     ((), "Anna uv:n polku"),
     (("/olematon/uv",), "Anna uv:n polku"),
