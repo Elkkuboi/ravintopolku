@@ -1,12 +1,12 @@
 // Ateria kuvasta: pikkukuva ja valinnainen lisätieto -> Tulkitse kuva -> odotus (Peru) -> tallentamaton luonnos
-// (nimi, kello, rivit ruoka / g / kcal, yhteensä) -> Tallenna tai Hylkää. Virheessä "Yritä uudelleen" lähettää saman
-// kuvan uudelleen ja "Kirjoita käsin" avaa käsin kirjauksen kuva liitettynä. Mitään ei tallenneta ennen Tallenna-napin
-// painamista; sovelluksen sulkeminen kesken hylkää luonnoksen. Toisella sivulla käynti ei hylkää: Tänään pysyy
+// (nimi, kello, rivit ruoka / g / kcal, yhteensä) -> kirjaus päiväkirjaan tai tallennus omiin ruokiin.
+// Virheessä "Yritä uudelleen" lähettää saman kuvan ja "Kirjoita käsin" avaa kirjauksen kuva liitettynä.
+// Sovelluksen sulkeminen kesken hylkää luonnoksen. Toisella sivulla käynti ei hylkää: Tänään pysyy
 // asennettuna piilossa (App.tsx), ja data-keskenerainen estää päivityksen latauksen tulkinnan ja luonnoksen aikana.
 import { Fragment, useEffect, useRef, useState } from "react";
-import { type Meal, type Photo } from "../domain/model";
+import { type Meal, type Photo, stamped } from "../domain/model";
 import { formatNumber } from "../domain/nutrition";
-import { defaultMealTime, saveMeal } from "../data/db";
+import { defaultMealTime, saveMeal, saveRecord } from "../data/db";
 import {
   tulkitseKuva,
   ateriaKuvasta,
@@ -15,6 +15,7 @@ import {
   rivinKcal,
   luonnosSumma,
   luonnosAteriaksi,
+  parseDraftLines,
   KUVA_VIRHE,
   LISATIEDOT_MAX,
   type LuonnosRivi,
@@ -46,7 +47,7 @@ export function KuvaLuonnos({
   date: string;
   onUusi: (file: File) => void;
   onPeru: () => void;
-  onTallennettu: () => void;
+  onTallennettu: (message: string) => void;
   onKasin: (photo: Photo, lisatieto: string) => void;
 }) {
   const [vaihe, setVaihe] = useState<Vaihe>("valittu"),
@@ -95,6 +96,7 @@ export function KuvaLuonnos({
     setVaihe("valittu");
   };
   const hylkaa = () => {
+    if (busy) return;
     if (
       vaihe !== "luonnos" ||
       window.confirm("Hylätäänkö luonnos? Ateriaa ei tallenneta.")
@@ -300,13 +302,36 @@ export function KuvaLuonnos({
                     ),
                     photo,
                   );
-                  onTallennettu();
+                  onTallennettu("Tallennettu.");
                 })
               }
             >
               {busy ? "Tallennetaan…" : "Tallenna"}
             </button>
-            <button className="btn" onClick={hylkaa}>
+            <button
+              className="btn"
+              disabled={busy}
+              onClick={() =>
+                void execute(async () => {
+                  const lines = parseDraftLines(luonnos.rivit);
+                  const name = luonnos.nimi.trim() || lines[0].name;
+                  if (name.length > 200)
+                    throw new Error(
+                      "Oman ruuan nimi saa olla enintään 200 merkkiä.",
+                    );
+                  await saveRecord("templates", {
+                    ...stamped(),
+                    name,
+                    lines,
+                    type: luonnos.pohja.type,
+                  });
+                  onTallennettu("Tallennettu omiin ruokiin.");
+                })
+              }
+            >
+              Tallenna omiin ruokiin
+            </button>
+            <button className="btn" disabled={busy} onClick={hylkaa}>
               Hylkää
             </button>
           </section>

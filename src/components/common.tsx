@@ -35,12 +35,14 @@ export function Decimal({
   onChange,
   required = false,
   placeholder = "Esim. 12,5",
+  autoFocus = false,
 }: {
   id?: string;
   value: string;
   onChange: (v: string) => void;
   required?: boolean;
   placeholder?: string;
+  autoFocus?: boolean;
 }) {
   return (
     <input
@@ -51,6 +53,7 @@ export function Decimal({
       required={required}
       placeholder={placeholder}
       autoComplete="off"
+      autoFocus={autoFocus}
     />
   );
 }

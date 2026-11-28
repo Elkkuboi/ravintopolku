@@ -538,6 +538,75 @@ test("kuvapolku: kuva, lisätieto, luonnos ja tallennus", async ({ page }) => {
   expect(virheet).toEqual([]);
 });
 
+test("save an interpreted serving once and log it again without interpreting", async ({
+  page,
+}) => {
+  const { pyynnot } = await palvelin(page);
+  await page.goto("/");
+  await kamera(page).setInputFiles(await kuvatiedosto(page));
+  await page.getByRole("button", { name: "Tulkitse kuva" }).click();
+  await page.getByLabel("Nimi", { exact: true }).fill("Lounasannos");
+  await page.getByLabel("Grammat 1").fill("75");
+  await page.getByRole("button", { name: "Tallenna omiin ruokiin" }).click();
+  await expect(page.getByText("Ei kirjattuja aterioita.")).toBeVisible();
+  await page.reload();
+
+  for (let count = 1; count <= 2; count++) {
+    await page.getByRole("button", { name: "Omat ruuat", exact: true }).click();
+    const serving = page.getByRole("button", { name: "Kirjaa Lounasannos" });
+    await expect(serving).toContainText("384 kcal / annos");
+    await serving.click();
+    await expect(
+      page
+        .getByRole("region", { name: "Ateriat" })
+        .getByRole("button", { name: /Lounasannos/ }),
+    ).toHaveCount(count);
+    await expect(page.locator(".figure-num")).toHaveText(String(count * 384));
+  }
+  expect(
+    pyynnot.filter((request) => request.polku === "/api/kuva-ateria"),
+  ).toHaveLength(1);
+
+  await page.getByRole("link", { name: "Asetukset" }).click();
+  await page.getByText("Näytä ja muokkaa", { exact: true }).click();
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Poista Lounasannos" }).click();
+  await expect(page.getByText("Ei omia ruokia.")).toBeVisible();
+  await page.getByRole("link", { name: "Tänään" }).click();
+  await expect(page.locator(".figure-num")).toHaveText("768");
+});
+
+test("log a saved food with a measured quantity from Today", async ({ page }) => {
+  const { pyynnot } = await palvelin(page);
+  await page.goto("/#asetukset");
+  await page.getByText("Näytä ja muokkaa", { exact: true }).click();
+  await page.getByRole("button", { name: "Uusi ruoka" }).click();
+  const editor = page.getByRole("dialog", { name: "Uusi ruoka" });
+  await editor.getByLabel("Ruuan nimi").fill("Ruisleipä");
+  await editor.getByLabel("Energia (kcal)").fill("200");
+  await editor.getByRole("button", { name: "Tallenna ruoka" }).click();
+  await expect(editor).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Tänään" }).click();
+  await page.getByRole("button", { name: "Omat ruuat", exact: true }).click();
+  const picker = page.getByRole("dialog", { name: "Kirjaa omista ruuista" });
+  await picker.getByLabel("Hae omista ruuista").fill("ruis");
+  await picker.getByRole("button", { name: "Valitse määrä, Ruisleipä" }).click();
+  const amount = picker.getByLabel("Määrä (g)");
+  await amount.fill("0");
+  await picker.getByRole("button", { name: "Kirjaa", exact: true }).click();
+  await expect(picker.getByRole("alert")).toHaveText("Anna määrä grammoina.");
+  await amount.fill("75,5");
+  await picker.getByRole("button", { name: "Kirjaa", exact: true }).click();
+  await expect(
+    page.locator("button.meal", { hasText: "Ruisleipä" }),
+  ).toContainText("151");
+  await expect(page.locator(".figure-num")).toHaveText("151");
+  expect(pyynnot.some((request) => request.polku === "/api/kuva-ateria")).toBe(
+    false,
+  );
+});
+
 test("virhepolku: lyhyt suomenkielinen viesti ja käsin kirjaus", async ({
   page,
 }) => {

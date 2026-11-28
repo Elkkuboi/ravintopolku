@@ -173,7 +173,7 @@ describe("karsitut osat pysyvät poissa", () => {
     "src/components/ProfileForm.tsx",
   ];
   const lahde = tiedostot.map((f) => readFileSync(f, "utf8")).join("\n");
-  it("ei kuvan lähde- tai roolivalintaa, AI-yhteyttä, poista kaikkea, vakioaterioita eikä tallennuksen tilaa", () => {
+  it("ei kuvan lähde- tai roolivalintaa, AI-yhteyttä, poista kaikkea, erillistä vakioateriavalikkoa eikä tallennuksen tilaa", () => {
     for (const kielletty of [
       "kuvantunnistus",
       "kuvantulkinta",
@@ -182,8 +182,7 @@ describe("karsitut osat pysyvät poissa", () => {
       "useAIStatus",
       "eraseAll",
       "Poista kaikki",
-      "removeTemplate",
-      "templates",
+      "Vakioateriat",
       "storage.persist",
       "Kokeilu",
     ])

@@ -20,6 +20,9 @@ section.capture { row-gap: 1.4rem; }   /* style.css tulee nippuun myöhemmin: il
 
 /* Ateriat, paino, taite */
 button.meal { font: inherit; align-items: normal; }   /* kuten mallin <a>: kello ja kcal nimen ensimmäisellä rivillä */
+button.saved-food { grid-template-columns: minmax(0, 1fr) max-content; overflow-wrap: anywhere; }
+button.saved-food .sub { grid-column: 1; grid-row: 2; }
+.saved-food-action { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .inline-field .note { flex-basis: 100%; }
 label.inline.valmis { margin-top: 1.25rem; min-height: 44px; }
 label.inline.suosikki { margin-top: 1rem; min-height: 44px; }

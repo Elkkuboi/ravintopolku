@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { type Food } from "../domain/model";
 import { formatNumber } from "../domain/nutrition";
-import { removeFood } from "../data/db";
+import { removeFood, removeTemplate } from "../data/db";
 import { FoodForm } from "../components/FoodForm";
 import { Modal } from "../components/common";
 import { Promptit } from "../components/Promptit";
@@ -19,17 +19,19 @@ function OmatRuuat({ data, notify, run }: NakymaProps) {
   const [haku, setHaku] = useState(""),
     [auki, setAuki] = useState<Food | "uusi" | null>(null);
   const sana = haku.trim().toLocaleLowerCase("fi");
+  const count = data.foods.length + data.templates.length;
   const ruuat = [...data.foods]
     .sort((a, b) => a.name.localeCompare(b.name, "fi"))
     .filter((f) => f.name.toLocaleLowerCase("fi").includes(sana));
+  const templates = data.templates
+    .filter((template) => template.name.toLocaleLowerCase("fi").includes(sana))
+    .sort((a, b) => a.name.localeCompare(b.name, "fi"));
   const muokattava = auki === "uusi" ? undefined : (auki ?? undefined);
   return (
     <section>
       <h2 className="label">
         Omat ruuat{" "}
-        {data.foods.length > 0 && (
-          <span className="aside">{data.foods.length} ruokaa</span>
-        )}
+        {count > 0 && <span className="aside">{count} ruokaa</span>}
       </h2>
       <details className="fold">
         <summary>Näytä ja muokkaa</summary>
@@ -42,7 +44,7 @@ function OmatRuuat({ data, notify, run }: NakymaProps) {
             >
               Uusi ruoka
             </button>
-            {data.foods.length > HAKU_KUN_YLI && (
+            {count > HAKU_KUN_YLI && (
               <input
                 type="search"
                 aria-label="Hae ruokaa"
@@ -52,8 +54,32 @@ function OmatRuuat({ data, notify, run }: NakymaProps) {
               />
             )}
           </div>
-          {ruuat.length ? (
+          {ruuat.length || templates.length ? (
             <ul className="rows ruuat">
+              {templates.map((template) => (
+                <li className="saved-template" key={template.id}>
+                  <span>{template.name}</span>
+                  <button
+                    type="button"
+                    className="btn--quiet"
+                    aria-label={`Poista ${template.name}`}
+                    onClick={() =>
+                      void run(async () => {
+                        if (
+                          !window.confirm(
+                            `Poistetaanko ${template.name}? Aiemmat ateriat säilyvät.`,
+                          )
+                        )
+                          return;
+                        await removeTemplate(template.id);
+                        notify("Annos poistettu omista ruuista.");
+                      })
+                    }
+                  >
+                    Poista
+                  </button>
+                </li>
+              ))}
               {ruuat.map((f) => (
                 <li key={f.id}>
                   <button
@@ -70,9 +96,7 @@ function OmatRuuat({ data, notify, run }: NakymaProps) {
               ))}
             </ul>
           ) : (
-            <p className="empty">
-              {data.foods.length ? "Ei osumia." : "Ei omia ruokia."}
-            </p>
+            <p className="empty">{count ? "Ei osumia." : "Ei omia ruokia."}</p>
           )}
         </div>
       </details>

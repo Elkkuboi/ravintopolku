@@ -18,13 +18,14 @@ import { draftOrigin, draftNotes } from "../ai/draft-fields";
 import { ateriatyyppi } from "../ai/kuva-ateria";
 import { type AIDraft } from "../ai/provider";
 import { tulkitseKuvaus } from "../ai/ateria-kuvaus";
-import { aterianKopio, kuvastaTulkittu } from "../nakymat/paiva";
+import { aterianKopio, mealTitleFromNote } from "../nakymat/paiva";
 import { Field, Decimal, Form, NutrientFields, BlobImage } from "./common";
 import { parseNutrients } from "./form-values";
 import {
   type EditableLine,
   editLine,
   freshLine,
+  foodLine,
   parseLines,
   epatavallinen,
   rakennaAteria,
@@ -341,19 +342,7 @@ export function MealEditor({
                   className="btn--quiet"
                   key={f.id}
                   onClick={() =>
-                    setLines([
-                      ...lines,
-                      editLine({
-                        id: id(),
-                        name: f.name,
-                        foodId: f.id,
-                        mode: "per100",
-                        grams: 100,
-                        values: { ...f.per100 },
-                        source: f.source,
-                        state: f.state,
-                      }),
-                    ])
+                    setLines([...lines, editLine(foodLine(f))])
                   }
                 >
                   {f.name}
@@ -379,7 +368,9 @@ export function MealEditor({
         )}
         <Field
           label={
-            (kuvastaTulkittu(origin) || tulostettava !== null) ? "Nimi" : "Muistiinpano"
+            mealTitleFromNote(origin) || tulostettava !== null
+              ? "Nimi"
+              : "Muistiinpano"
           }
         >
           <textarea
