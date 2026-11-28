@@ -8,6 +8,7 @@
 .ruoka { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 1.2ch; width: 100%; min-height: 44px; padding: .55rem 0; border: 0; background: transparent; color: var(--ink); font-weight: 400; text-align: left; white-space: normal; }
 .ruoka:hover { background: var(--sheet); color: var(--ink); }
 .ruoka .muted { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ruuat > li.saved-template { display: flex; align-items: center; justify-content: space-between; gap: 1ch; padding: .4rem 0; overflow-wrap: anywhere; }
 .poisto { margin-top: 2.25rem; }
 
 /* Tekstin sisäinen linkki: pystytäyte kasvattaa kosketusalueen 44 px:iin muuttamatta riviä. */

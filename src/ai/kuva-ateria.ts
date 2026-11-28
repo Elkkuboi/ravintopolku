@@ -252,6 +252,12 @@ export function luonnosSumma(rivit: LuonnosRivi[]): Totals | null {
   }
 }
 
+export function parseDraftLines(rivit: LuonnosRivi[]): MealLine[] {
+  const lines = rivit.filter((r) => r.nimi.trim()).map(riviksi);
+  if (!lines.length) throw new Error("Lisää vähintään yksi ruoka.");
+  return lines;
+}
+
 /** Tallennettava ateria: tyhjänimiset rivit jäävät pois, ateriatyyppi seuraa kelloa. */
 export function luonnosAteriaksi(
   pohja: Meal,
@@ -259,8 +265,7 @@ export function luonnosAteriaksi(
   kello: string,
   rivit: LuonnosRivi[],
 ): Meal {
-  const lines = rivit.filter((r) => r.nimi.trim()).map(riviksi);
-  if (!lines.length) throw new Error("Lisää vähintään yksi ruoka.");
+  const lines = parseDraftLines(rivit);
   return {
     ...pohja,
     time: kello,

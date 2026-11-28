@@ -142,6 +142,8 @@ export const removeWeight = (id: string, database = db) =>
   database.weights.delete(id);
 export const removeFood = (id: string, database = db) =>
   database.foods.delete(id);
+export const removeTemplate = (id: string, database = db) =>
+  database.templates.delete(id);
 export async function saveMeal(
   meal: Meal,
   photo: Photo | null,

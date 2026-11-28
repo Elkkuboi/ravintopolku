@@ -2,6 +2,7 @@
 // Piilotetut kentät kulkevat läpi muuttumattomina: rivin id, foodId, mode, source ja state sekä aterian origin,
 // assumptions, id ja createdAt. Tyhjennetty lähde saa arvon "Oma arvio", koska skeema vaatii lähteen.
 import {
+  type Food,
   type Meal,
   type MealLine,
   stamped,
@@ -38,6 +39,19 @@ export const freshLine = (mode: "per100" | "portion"): MealLine => ({
   source: "Oma arvio",
   state: "",
 });
+
+export function foodLine(food: Food, grams = 100): MealLine {
+  return {
+    id: id(),
+    name: food.name,
+    foodId: food.id,
+    mode: "per100",
+    grams,
+    values: { ...food.per100 },
+    source: food.source,
+    state: food.state,
+  };
+}
 
 /** Lomakkeen rivit tallennettaviksi riveiksi. Heittää suomenkielisen virheen, jos luku ei kelpaa. */
 export function parseLines(lines: EditableLine[]): MealLine[] {

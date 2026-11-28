@@ -28,9 +28,13 @@ export const kelloksi = (time: string) => time.replace(":", ".");
 /** Kuvasta tulkitun aterian muistiinpano on sen nimi (rivillä ja muokkauksen kentässä "Nimi"). */
 export const kuvastaTulkittu = (origin: string) => origin.startsWith("Kuvasta");
 
-/** Kuvasta tulkitun aterian nimi on sen muistiinpano; muuten rivien nimet. */
+export const SAVED_FOOD_ORIGIN = "Omat ruuat";
+export const mealTitleFromNote = (origin: string) =>
+  kuvastaTulkittu(origin) || origin === SAVED_FOOD_ORIGIN;
+
+/** Named meals show the saved name. Other meals show their food lines. */
 export function aterianOtsikko(meal: Meal): string {
-  if (kuvastaTulkittu(meal.origin) && meal.note.trim())
+  if (mealTitleFromNote(meal.origin) && meal.note.trim())
     return meal.note.trim();
   return meal.lines.map((l) => l.name).join(", ");
 }

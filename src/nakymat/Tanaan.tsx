@@ -10,6 +10,7 @@ import { saveLifestyle, saveRecord } from "../data/db";
 import { localDay, addDays } from "../domain/dates";
 import { dayTotals, goalForDay } from "../domain/nutrition";
 import { MealEditor } from "../components/MealEditor";
+import { SavedFoodPicker } from "../components/SavedFoodPicker";
 import { LifestyleForm, PainonKirjaus } from "../components/DailyForms";
 import { MakroMittarit } from "../components/MakroMittarit";
 import { IntegrationInbox } from "../components/IntegrationInbox";
@@ -42,6 +43,7 @@ const pysyva = () => void navigator.storage?.persist?.().catch(() => {});
 export default function Tanaan({ data, notify, run }: NakymaProps) {
   const [date, setDate] = useState(localDay()),
     [dialog, setDialog] = useState<Dialog>(null),
+    [savedFoodsOpen, setSavedFoodsOpen] = useState(false),
     [kuva, setKuva] = useState<Kuva>(null),
     [avataan, setAvataan] = useState(false),
     [luonnokset, setLuonnokset] = useState(0),
@@ -91,9 +93,9 @@ export default function Tanaan({ data, notify, run }: NakymaProps) {
         date={date}
         onUusi={(f) => valitse(f, kuva.lahde)}
         onPeru={() => setKuva(null)}
-        onTallennettu={() => {
+        onTallennettu={(message) => {
           setKuva(null);
-          notify("Tallennettu.");
+          notify(message);
           pysyva();
         }}
         onKasin={(photo, note) => {
@@ -153,6 +155,9 @@ export default function Tanaan({ data, notify, run }: NakymaProps) {
         />
         <button className="btn" onClick={() => avaa({})}>
           Kirjoita
+        </button>
+        <button className="btn" onClick={() => setSavedFoodsOpen(true)}>
+          Omat ruuat
         </button>
       </section>
 
@@ -241,6 +246,19 @@ export default function Tanaan({ data, notify, run }: NakymaProps) {
           Päivän kirjaukset ovat valmiit
         </label>
       </details>
+
+      {savedFoodsOpen && (
+        <SavedFoodPicker
+          data={data}
+          date={date}
+          onClose={() => setSavedFoodsOpen(false)}
+          onSaved={(message) => {
+            setSavedFoodsOpen(false);
+            notify(message);
+            pysyva();
+          }}
+        />
+      )}
 
       {dialog && (
         <Modal
